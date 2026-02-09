@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "filelib"
+version = "0.0.1"
+description = "A utility library of file-handling functions reused across my projects."
+requires-python = ">=3.9"
+authors = [
+    { name = "Tao Jing", email = "634790985@qq.com" },
+    { name = "Tao Jing", email = "jingt20@mails.tsinghua.edu.cn" },
+]
+
+dependencies = []
+
+[tool.setuptools]
+packages = { find = {} }
