@@ -2,6 +2,7 @@ import os
 import shutil
 from pathlib import Path
 
+# TODO: verbose option for print
 
 def remove(path, recursive=False, dry_run=False):
     """

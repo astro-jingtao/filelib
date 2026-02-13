@@ -1,0 +1,6 @@
+- `resolver.py`
+  - 路径解析
+- `operator.py`
+  - 文件操作
+- `scanner.py`
+  - 路径扫描
