@@ -1,10 +1,9 @@
 import os
 import shutil
 from pathlib import Path
+from filelib.printer import Printer
 
-# TODO: verbose option for print
-
-def remove(path, recursive=False, dry_run=False):
+def remove(path, recursive=False, dry_run=False, run_log=False):
     """
     删除文件或目录。
 
@@ -15,9 +14,13 @@ def remove(path, recursive=False, dry_run=False):
             False : 如果文件夹非空，则报错。
             'skip': 如果文件夹非空，则跳过不删除。
         dry_run (bool): 如果为 True，仅打印将要执行的操作，不实际删除。
+        run_log (bool): 如果为 True，在执行操作时打印详细信息。
     """
+
+    printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
+
     if not os.path.exists(path):
-        print(f"Warning: Path does not exist, skipping: {path}")
+        printer.print_warning(f"Path does not exist, skipping: {path}")
         return
 
     is_dir = os.path.isdir(path)
@@ -29,36 +32,29 @@ def remove(path, recursive=False, dry_run=False):
         # 处理非空文件夹的逻辑
         if not is_empty:
             if recursive == 'skip':
-                if dry_run:
-                    print(f"[dry-run] Skip non-empty directory: {path}")
+                printer.print_general_run_log(
+                    f"Skipped non-empty directory: {path}")
                 return
-
             if recursive is False:
                 # 模拟 os.rmdir 的行为，直接抛出异常
                 raise OSError(f"[Error] Directory not empty: '{path}'")
 
-    # Dry Run 打印逻辑
-    if dry_run:
-        # 走到这里意味着操作将会执行
-        if is_dir:
-            # 只有 recursive=True 时才会真正打印 "Remove"，
-            # 否则如果是空文件夹，recursive参数不影响结果，也可以打印 Remove
-            print(f"[dry-run] Remove directory: {path}")
-        else:
-            print(f"[dry-run] Remove file: {path}")
-        return
-
-    # 实际执行逻辑
-    if is_dir:
+        # 实际操作
         if recursive is True or recursive == 'skip':
             # 'skip' 情况下如果能走到这，说明文件夹是空的，正常删除即可
             # True 情况下，无论是否为空都强制删除
-            shutil.rmtree(path)
+            if not dry_run:
+                shutil.rmtree(path)
+            printer.print_general_run_log(f"Removed directory: {path}")
         else:
             # recursive=False 且文件夹为空的情况
-            os.rmdir(path)
+            if not dry_run:
+                os.rmdir(path)
+            printer.print_general_run_log(f"Removed empty directory: {path}")
     else:
-        os.remove(path)
+        if not dry_run:
+            os.remove(path)
+        printer.print_general_run_log(f"Removed file: {path}")
 
 
 def move(src,
@@ -66,22 +62,25 @@ def move(src,
          copy_function=None,
          dry_run=False,
          exist_policy='default',
-         make_dir=False):
+         make_dir=False,
+         run_log=False):
 
-    dst = _check_exist_when_move(dst, exist_policy)
+    printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
 
-    _check_dir_when_move(dst, make_dir, dry_run=dry_run)
+    dst = _check_exist_when_move(dst, exist_policy, dry_run, printer)
 
-    if dry_run:
-        print(f"[dry-run] Move {src} to {dst}")
-    else:
+    _check_dir_when_move(dst, make_dir, dry_run, printer)
+
+    if not dry_run:
         if copy_function is None:
             shutil.move(src, dst)
         else:
             shutil.move(src, dst, copy_function=copy_function)
 
+    printer.print_general_run_log(f"Moved {src} to {dst}")
 
-def _check_dir_when_move(dst, make_dir, dry_run=False):
+
+def _check_dir_when_move(dst, make_dir, dry_run, printer: Printer):
     """ check if the parent folder of dst exist, if not, create it or raise error
 
     Parameters
@@ -95,17 +94,16 @@ def _check_dir_when_move(dst, make_dir, dry_run=False):
     dst_folder = os.path.dirname(dst)
     if not os.path.exists(dst_folder):
         if make_dir:
-            if dry_run:
-                print(f"[dry-run] Create directory {dst_folder}")
-            else:
+            if not dry_run:
                 os.makedirs(dst_folder, exist_ok=False)
+            printer.print_general_run_log(f"Create directory {dst_folder}")
         else:
             raise FileNotFoundError(
                 f"Parent folder {dst_folder} of destination {dst} does not exist."
             )
 
 
-def _check_exist_when_move(dst, exist_policy):
+def _check_exist_when_move(dst, exist_policy, dry_run, printer: Printer):
     """ check if dst already exist and deal with it according to `exist_policy`
 
     Parameters
@@ -114,6 +112,10 @@ def _check_exist_when_move(dst, exist_policy):
         destination path
     exist_policy : str
         'default' (do nothing), 'overwrite' (remove existing file), 'rename' (add suffix to existing file)
+    dry_run : bool
+        if True, only print the operation without actually doing it
+    printer : Printer
+        printer object for logging
     """
 
     MAX_TRY = 10000
@@ -124,7 +126,9 @@ def _check_exist_when_move(dst, exist_policy):
 
     # Now a file exist
     if exist_policy == 'overwrite':
-        os.remove(dst)
+        if not dry_run:
+            os.remove(dst)
+        printer.print_general_run_log(f"Removed existing file: {dst}")
         return dst
     elif exist_policy == 'rename':
         dst_new = get_unique_new_dst(dst, MAX_TRY)
