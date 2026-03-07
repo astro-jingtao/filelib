@@ -39,6 +39,8 @@ pip install -e .
   - `is_file_corrupted`: image completeness check for common formats
 - `filelib.printer`
   - internal helper used for `dry_run`, run logs, and warning messages
+- `filelib.skill_deployer`
+  - `deploy_skill`: deploy a skill folder to Copilot and/or Claude locations
 
 ## Quick Start
 
@@ -129,6 +131,30 @@ result = is_file_corrupted(
 print(result)  # True: corrupted, False: complete, None: unsupported mime (with policy=return)
 ```
 
+### 6) Deploy a skill to Copilot/Claude
+
+```python
+from filelib.skill_deployer import deploy_skill
+
+# Deploy to current project's Copilot + Claude skill folders
+paths = deploy_skill(
+  skill_dir="doc/agent",
+  destination="project",
+  assistant="both",
+  project_root=".",
+  overwrite=True,
+)
+print(paths)
+
+# Deploy to user home for Copilot only
+deploy_skill(
+  skill_dir="doc/agent",
+  destination="home",
+  assistant="copilot",
+  overwrite=False,
+)
+```
+
 ## API Notes and Behaviors
 
 ### `scanner.ls`
@@ -171,6 +197,16 @@ print(result)  # True: corrupted, False: complete, None: unsupported mime (with 
 - MIME source can be:
   - `magic` (content-based)
   - `extension` (suffix-based)
+
+### `skill_deployer.deploy_skill`
+
+- `destination`:
+  - `project` -> `<project_root>/.github/skills` (copilot), `<project_root>/.claude/skills` (claude)
+  - `home` -> `~/.copilot/skills` (copilot), `~/.claude/skills` (claude)
+- `assistant`: `copilot`, `claude`, or `both`
+- `overwrite=True` replaces existing deployed folder
+- `use_symlink=True` creates symbolic links instead of copying
+- `skill_dir` must contain `SKILL.md`
 
 ## Testing
 
