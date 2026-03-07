@@ -39,7 +39,8 @@ def get_mime_extension(file_path: Path | str) -> str:
 def is_file_corrupted(file_path: Path | str,
                       mime=None,
                       mime_method='magic',
-                      unsupported_policy='None') -> bool | None:
+                      unsupported_policy='return',
+                      unsupported_return=None) -> bool | None:
     if mime is None:
         if mime_method == 'magic':
             mime = get_mime_magic(file_path)
@@ -50,12 +51,8 @@ def is_file_corrupted(file_path: Path | str,
 
     checker = MINE_COMPLETE_CHECKER_MAP.get(mime)
     if checker is None:
-        if unsupported_policy == 'False':
-            return False
-        elif unsupported_policy == 'True':
-            return True
-        elif unsupported_policy == 'None':
-            return None
+        if unsupported_policy == 'return':
+            return unsupported_return
         elif unsupported_policy == 'raise':
             raise ValueError(f'Unsupported MIME type: {mime}')
         else:

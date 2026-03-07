@@ -2,7 +2,7 @@
 
 import pytest
 import filelib.operator as operator_module
-from filelib.operator import move, remove
+from filelib.operator import copy, move, remove
 
 
 class TestRemove:
@@ -349,4 +349,229 @@ class TestMove:
 
         assert calls["src"] == str(self.src_file)
         assert calls["dst"] == str(dst_file)
+        assert calls["copy_function"] is fake_copy_function
+
+
+class TestCopy:
+
+    @pytest.fixture(autouse=True)
+    def setup_tmpdir(self, tmp_path):
+        self.test_dir = tmp_path / "copy_root"
+        self.test_dir.mkdir()
+
+        self.src_dir = self.test_dir / "src"
+        self.src_dir.mkdir()
+
+        self.dst_dir = self.test_dir / "dst"
+        self.dst_dir.mkdir()
+
+        self.src_file = self.src_dir / "source.txt"
+        self.src_file.write_text("source content")
+
+        self.src_folder = self.src_dir / "source_folder"
+        self.src_folder.mkdir()
+        (self.src_folder / "inner.txt").write_text("inner content")
+
+        yield
+
+    def test_copy_to_file_path_success(self):
+        """默认复制到目标文件路径：成功复制"""
+        dst_file = self.dst_dir / "copied.txt"
+
+        copy(str(self.src_file), str(dst_file))
+
+        assert self.src_file.exists()
+        assert dst_file.exists()
+        assert dst_file.read_text() == "source content"
+
+    def test_copy_to_existing_directory_success(self):
+        """目标为已有目录：复制后文件进入该目录"""
+        copy(str(self.src_file), str(self.dst_dir))
+
+        copied_file = self.dst_dir / self.src_file.name
+        assert self.src_file.exists()
+        assert copied_file.exists()
+        assert copied_file.read_text() == "source content"
+
+    def test_copy_directory_success(self):
+        """复制目录：复制整个目录树"""
+        dst_folder = self.dst_dir / "copied_folder"
+
+        copy(str(self.src_folder), str(dst_folder))
+
+        assert self.src_folder.exists()
+        assert dst_folder.exists()
+        assert (dst_folder / "inner.txt").read_text() == "inner content"
+
+    def test_copy_make_dir_true_creates_parent(self):
+        """make_dir=True 时自动创建父目录并复制"""
+        dst_file = self.test_dir / "new_parent" / "deep" / "copied.txt"
+
+        copy(str(self.src_file), str(dst_file), make_dir=True)
+
+        assert self.src_file.exists()
+        assert dst_file.exists()
+        assert dst_file.read_text() == "source content"
+
+    def test_copy_make_dir_false_raises(self):
+        """make_dir=False 且目标父目录不存在：抛出 FileNotFoundError"""
+        dst_file = self.test_dir / "new_parent" / "deep" / "copied.txt"
+
+        with pytest.raises(FileNotFoundError) as excinfo:
+            copy(str(self.src_file), str(dst_file), make_dir=False)
+
+        assert "does not exist" in str(excinfo.value)
+        assert self.src_file.exists()
+
+    def test_copy_exist_policy_overwrite(self):
+        """exist_policy='overwrite'：先删除目标再复制"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        copy(str(self.src_file), str(dst_file), exist_policy='overwrite')
+
+        assert self.src_file.exists()
+        assert dst_file.exists()
+        assert dst_file.read_text() == "source content"
+
+    def test_copy_exist_policy_rename(self):
+        """exist_policy='rename'：目标已存在时自动改名"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        renamed_0 = self.dst_dir / "target_0.txt"
+        renamed_0.write_text("occupied")
+
+        copy(str(self.src_file), str(dst_file), exist_policy='rename')
+
+        renamed_1 = self.dst_dir / "target_1.txt"
+        assert self.src_file.exists()
+        assert dst_file.read_text() == "old content"
+        assert renamed_0.read_text() == "occupied"
+        assert renamed_1.exists()
+        assert renamed_1.read_text() == "source content"
+
+    def test_copy_exist_policy_invalid_raises(self):
+        """非法 exist_policy：抛出 ValueError"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        with pytest.raises(ValueError) as excinfo:
+            copy(str(self.src_file), str(dst_file), exist_policy='invalid')
+
+        assert "exist_policy must be" in str(excinfo.value)
+        assert self.src_file.exists()
+
+    def test_copy_dry_run_no_fs_change(self, capsys):
+        """dry_run=True：不执行真实复制，但输出 dry-run 日志"""
+        dst_file = self.dst_dir / "dry_copied.txt"
+
+        copy(str(self.src_file), str(dst_file), dry_run=True)
+
+        captured = capsys.readouterr()
+        assert "[dry-run] Copied" in captured.out
+        assert self.src_file.exists()
+        assert not dst_file.exists()
+
+    def test_copy_dry_run_overwrite_keeps_destination(self, capsys):
+        """dry_run + overwrite：不删除原目标文件"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        copy(str(self.src_file),
+             str(dst_file),
+             dry_run=True,
+             exist_policy='overwrite')
+
+        captured = capsys.readouterr()
+        assert "[dry-run] Removed existing file" in captured.out
+        assert "[dry-run] Copied" in captured.out
+        assert self.src_file.exists()
+        assert dst_file.read_text() == "old content"
+
+    def test_copy_run_log_prints_log(self, capsys):
+        """run_log=True：输出执行日志（非 dry-run）"""
+        dst_file = self.dst_dir / "runlog.txt"
+
+        copy(str(self.src_file), str(dst_file), run_log=True)
+
+        captured = capsys.readouterr()
+        assert "Copied" in captured.out
+        assert "[dry-run]" not in captured.out
+
+    def test_copy_run_log_with_make_dir_prints_create(self, capsys):
+        """run_log=True + make_dir=True：打印创建目录日志"""
+        dst_file = self.test_dir / "new_parent" / "deep" / "runlog.txt"
+
+        copy(str(self.src_file), str(dst_file), make_dir=True, run_log=True)
+
+        captured = capsys.readouterr()
+        assert "Create directory" in captured.out
+        assert "Copied" in captured.out
+        assert "[dry-run]" not in captured.out
+
+    def test_copy_run_log_with_dry_run_prints_dry_run_only(self, capsys):
+        """run_log + dry_run：仅输出 dry-run 日志"""
+        dst_file = self.dst_dir / "runlog_dry.txt"
+
+        copy(str(self.src_file), str(dst_file), run_log=True, dry_run=True)
+
+        captured = capsys.readouterr()
+        assert "[dry-run] Copied" in captured.out
+        assert "\nCopied" not in captured.out
+
+    def test_copy_file_uses_default_copy2(self, monkeypatch):
+        """文件复制默认调用 shutil.copy2"""
+        calls = {}
+
+        def fake_copy2(src, dst):
+            calls["src"] = src
+            calls["dst"] = dst
+            return dst
+
+        monkeypatch.setattr(operator_module.shutil, "copy2", fake_copy2)
+
+        dst_file = self.dst_dir / "copied.txt"
+        copy(str(self.src_file), str(dst_file))
+
+        assert calls["src"] == str(self.src_file)
+        assert calls["dst"] == str(dst_file)
+
+    def test_copy_file_passes_copy_function(self):
+        """文件复制传入 copy_function 时应调用该函数"""
+        calls = {}
+
+        def fake_copy_function(src, dst):
+            calls["src"] = src
+            calls["dst"] = dst
+            return dst
+
+        dst_file = self.dst_dir / "custom.txt"
+        copy(str(self.src_file), str(dst_file), copy_function=fake_copy_function)
+
+        assert calls["src"] == str(self.src_file)
+        assert calls["dst"] == str(dst_file)
+
+    def test_copy_directory_passes_copy_function_to_copytree(self, monkeypatch):
+        """目录复制传入 copy_function 时应透传给 shutil.copytree"""
+        calls = {}
+
+        def fake_copytree(src, dst, copy_function=None):
+            calls["src"] = src
+            calls["dst"] = dst
+            calls["copy_function"] = copy_function
+            return dst
+
+        def fake_copy_function(src, dst):
+            return dst
+
+        monkeypatch.setattr(operator_module.shutil, "copytree", fake_copytree)
+
+        dst_folder = self.dst_dir / "copied_folder"
+        copy(str(self.src_folder),
+             str(dst_folder),
+             copy_function=fake_copy_function)
+
+        assert calls["src"] == str(self.src_folder)
+        assert calls["dst"] == str(dst_folder)
         assert calls["copy_function"] is fake_copy_function

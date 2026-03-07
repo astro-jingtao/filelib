@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 from filelib.printer import Printer
 
+
 def remove(path, recursive=False, dry_run=False, run_log=False):
     """
     删除文件或目录。
@@ -67,9 +68,9 @@ def move(src,
 
     printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
 
-    dst = _check_exist_when_move(dst, exist_policy, dry_run, printer)
+    dst = _check_dst_exist(dst, exist_policy, dry_run, printer)
 
-    _check_dir_when_move(dst, make_dir, dry_run, printer)
+    _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer)
 
     if not dry_run:
         if copy_function is None:
@@ -80,7 +81,37 @@ def move(src,
     printer.print_general_run_log(f"Moved {src} to {dst}")
 
 
-def _check_dir_when_move(dst, make_dir, dry_run, printer: Printer):
+def copy(src,
+         dst,
+         copy_function=None,
+         dry_run=False,
+         exist_policy='default',
+         make_dir=False,
+         run_log=False):
+    # TODO: if -r 
+
+    printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
+
+    dst = _check_dst_exist(dst, exist_policy, dry_run, printer)
+
+    _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer)
+
+    if not dry_run:
+        if os.path.isdir(src):
+            if copy_function is None:
+                shutil.copytree(src, dst)
+            else:
+                shutil.copytree(src, dst, copy_function=copy_function)
+        else:
+            if copy_function is None:
+                shutil.copy2(src, dst)
+            else:
+                copy_function(src, dst)
+
+    printer.print_general_run_log(f"Copied {src} to {dst}")
+
+
+def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
     """ check if the parent folder of dst exist, if not, create it or raise error
 
     Parameters
@@ -103,7 +134,7 @@ def _check_dir_when_move(dst, make_dir, dry_run, printer: Printer):
             )
 
 
-def _check_exist_when_move(dst, exist_policy, dry_run, printer: Printer):
+def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer):
     """ check if dst already exist and deal with it according to `exist_policy`
 
     Parameters

@@ -90,3 +90,6 @@ def ls(directory=".",
                 )
 
     return sorted(result)
+
+def is_empty_dir(directory):
+    ...
