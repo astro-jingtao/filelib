@@ -41,6 +41,7 @@ pip install -e .
   - internal helper used for `dry_run`, run logs, and warning messages
 - `filelib.skill_deployer`
   - `deploy_skill`: deploy a skill folder to Copilot and/or Claude locations
+  - `deploy_filelib`: deploy filelib built-in skill folder (`doc/agent`)
 
 ## Quick Start
 
@@ -134,13 +135,15 @@ print(result)  # True: corrupted, False: complete, None: unsupported mime (with 
 ### 6) Deploy a skill to Copilot/Claude
 
 ```python
-from filelib.skill_deployer import deploy_skill
+from filelib.skill_deployer import deploy_filelib, deploy_skill
 
 # Deploy to current project's Copilot + Claude skill folders
 paths = deploy_skill(
   skill_dir="doc/agent",
   destination="project",
   assistant="both",
+  language="en",
+  skill_name="filelib-agent",
   project_root=".",
   overwrite=True,
 )
@@ -151,7 +154,25 @@ deploy_skill(
   skill_dir="doc/agent",
   destination="home",
   assistant="copilot",
+  language="zh",
   overwrite=False,
+)
+
+# Deploy filelib's built-in skill folder directly
+deploy_filelib(
+  destination="project",
+  assistant="both",
+  language="zh",
+  project_root=".",
+  overwrite=True,
+)
+
+# Override the deployed folder name under .../skills
+deploy_filelib(
+  destination="project",
+  assistant="copilot",
+  skill_name="my-filelib-skill",
+  project_root=".",
 )
 ```
 
@@ -204,9 +225,22 @@ deploy_skill(
   - `project` -> `<project_root>/.github/skills` (copilot), `<project_root>/.claude/skills` (claude)
   - `home` -> `~/.copilot/skills` (copilot), `~/.claude/skills` (claude)
 - `assistant`: `copilot`, `claude`, or `both`
+- `language`: `default|en|zh|<custom>`
+  - `default/en` -> source `SKILL.md`
+  - `zh` -> source `SKILL_zh.md`
+  - `<custom>` -> source `SKILL_<custom>.md`
+  - deployed file is always target `SKILL.md`
+- `skill_name`: target skill directory name under `.../skills`
 - `overwrite=True` replaces existing deployed folder
-- `use_symlink=True` creates symbolic links instead of copying
-- `skill_dir` must contain `SKILL.md`
+- `use_symlink=True` creates a symbolic link for target `SKILL.md`
+- Deployment follows skill spec layout: `<skills_root>/<skill_name>/SKILL.md`
+
+### `skill_deployer.deploy_filelib`
+
+- Uses filelib built-in skill folder: `doc/agent`
+- If `skill_name` is not provided:
+  - first try `name:` from selected `SKILL*.md` front matter
+  - fallback to `filelib-agent`
 
 ## Testing
 
