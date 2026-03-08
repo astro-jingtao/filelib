@@ -55,6 +55,7 @@ files = ls(
     match_func=lambda f: f.lower().endswith((".jpg", ".jpeg", ".png")),
     recursive=True,
     path_type="abs_full_path",
+    follow_symlinks=True,
 )
 
 print(files)
@@ -185,6 +186,9 @@ deploy_filelib(
   - `raw_full_path`
   - `abs_full_path`
   - `rel_path`
+- `follow_symlinks` controls whether recursive scan follows directory symlinks.
+  - default: `True`
+  - set `False` to skip traversing symlinked directories
 - If `path_type="file_only"`, duplicate filenames from different folders may collide.
 - Use `on_duplicates` in `file_only` mode:
   - `raise`

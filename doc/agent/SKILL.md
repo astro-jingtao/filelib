@@ -35,6 +35,8 @@ user-invocable: true
 
 ## Critical Behavior Constraints
 - `scanner.ls` actual default for `path_type` is `abs_full_path`.
+- `scanner.ls` `follow_symlinks` default is `True`.
+- `scanner.ls` follows directory symlinks only during recursive traversal.
 - `scanner.ls` can produce duplicate names when `path_type='file_only'`.
 - `operator.remove` supports `recursive` values: `True | False | 'skip'`.
 - `operator.move/copy` supports `exist_policy` values: `default | overwrite | rename`.
@@ -81,7 +83,20 @@ files = ls(
     directory='data/images',
     match_func=lambda f: f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')),
     recursive=True,
-    path_type='abs_full_path'
+    path_type='abs_full_path',
+    follow_symlinks=True,
+)
+```
+
+### 1b) Recursive scan without following directory symlinks
+```python
+from filelib.scanner import ls
+
+files = ls(
+    directory='data/images',
+    recursive=True,
+    path_type='rel_path',
+    follow_symlinks=False,
 )
 ```
 

@@ -1,11 +1,13 @@
 import warnings
 import os
 
+
 def ls(directory=".",
        match_func=None,
        recursive=False,
        path_type='abs_full_path',
-       on_duplicates="raise"):
+       on_duplicates="raise",
+       follow_symlinks=True):
     """
     List files in a directory, similar to the shell 'ls' command, with support for custom filtering and path formatting.
 
@@ -30,6 +32,10 @@ def ls(directory=".",
         * 'raise': Raises a ValueError.
         * 'warn': Warns the user with a UserWarning.
         * 'ignore': Ignores the duplicates.
+    follow_symlinks : bool, optional
+        If True, recursive directory traversal follows symbolic links to
+        directories. If False, symlinked directories are not traversed.
+        Defaults to True.
 
     Returns
     -------
@@ -45,7 +51,7 @@ def ls(directory=".",
     result = []
 
     # os.walk yields a 3-tuple (dirpath, dirnames, filenames)
-    for root, dirs, files in os.walk(directory):
+    for root, dirs, files in os.walk(directory, followlinks=follow_symlinks):
         for file in files:
             # Extension filtering logic
             if match_func and not match_func(file):
@@ -90,6 +96,7 @@ def ls(directory=".",
                 )
 
     return sorted(result)
+
 
 def is_empty_dir(directory):
     ...

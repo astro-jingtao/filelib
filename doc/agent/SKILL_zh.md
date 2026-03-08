@@ -35,6 +35,8 @@ user-invocable: true
 
 ## 关键行为约束
 - `scanner.ls` 的 `path_type` 实际默认值是 `abs_full_path`。
+- `scanner.ls` 的 `follow_symlinks` 默认值是 `True`。
+- `scanner.ls` 仅在递归扫描时才会跟随目录符号链接。
 - `scanner.ls` 在 `path_type='file_only'` 时可能出现重名冲突。
 - `operator.remove` 的 `recursive` 支持 `True | False | 'skip'`。
 - `operator.move/copy` 的 `exist_policy` 只支持 `default | overwrite | rename`。
@@ -81,7 +83,20 @@ files = ls(
     directory='data/images',
     match_func=lambda f: f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')),
     recursive=True,
-    path_type='abs_full_path'
+    path_type='abs_full_path',
+    follow_symlinks=True,
+)
+```
+
+### 1b) 递归扫描但不跟随目录符号链接
+```python
+from filelib.scanner import ls
+
+files = ls(
+    directory='data/images',
+    recursive=True,
+    path_type='rel_path',
+    follow_symlinks=False,
 )
 ```
 
