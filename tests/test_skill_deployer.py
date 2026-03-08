@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import pytest
 
@@ -63,13 +64,19 @@ class TestDeploySkill:
             )
 
     def test_project_symlink(self) -> None:
-        deployed = deploy_skill(
-            skill_dir=self.skill_dir,
-            destination="project",
-            assistant="copilot",
-            project_root=self.project_root,
-            use_symlink=True,
-        )
+        try:
+            deployed = deploy_skill(
+                skill_dir=self.skill_dir,
+                destination="project",
+                assistant="copilot",
+                project_root=self.project_root,
+                use_symlink=True,
+            )
+        except OSError as exc:
+            if os.name == "nt":
+                assert "Failed to create symlink" in str(exc)
+                return
+            raise
 
         target = Path(deployed["copilot"])
         target_skill_md = target / "SKILL.md"

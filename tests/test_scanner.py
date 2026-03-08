@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import pytest
 
@@ -14,7 +15,14 @@ def _prepare_symlink_tree(tmp_path: Path) -> Path:
 
     symlink_dir = root / "link_to_real"
     symlink_dir.parent.mkdir(parents=True, exist_ok=True)
-    symlink_dir.symlink_to(real_dir, target_is_directory=True)
+    try:
+        symlink_dir.symlink_to(real_dir, target_is_directory=True)
+    except OSError as exc:
+        # Windows without symlink privilege (no admin or no developer mode)
+        # commonly raises WinError 1314.
+        if os.name == "nt" and getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows symlink requires admin/developer mode (WinError 1314)")
+        raise
     return root
 
 
@@ -28,8 +36,9 @@ class TestLs:
         files = ls(directory=str(self.root),
                    recursive=True,
                    path_type="rel_path")
+        normalized = [Path(path).as_posix() for path in files]
 
-        assert files == ["link_to_real/sub/data.txt", "real/sub/data.txt"]
+        assert normalized == ["link_to_real/sub/data.txt", "real/sub/data.txt"]
 
     def test_ls_recursive_follow_symlinks_false_skips_symlinked_path(
             self) -> None:
@@ -39,5 +48,6 @@ class TestLs:
             path_type="rel_path",
             follow_symlinks=False,
         )
+        normalized = [Path(path).as_posix() for path in files]
 
-        assert files == ["real/sub/data.txt"]
+        assert normalized == ["real/sub/data.txt"]
