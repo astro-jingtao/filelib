@@ -11,6 +11,7 @@ user-invocable: true
 - 需要扫描目录并按规则筛选文件。
 - 需要移动、复制、删除文件或目录，并控制覆盖策略。
 - 需要判断两个路径是否指向同一真实位置。
+- 需要比较文件或文件夹是否完全相同。
 - 需要下载文件到本地。
 - 需要检测常见图片文件是否损坏。
 
@@ -20,6 +21,9 @@ user-invocable: true
   - `is_empty_dir(...)`: 当前是占位实现（`...`），不要在自动流程里使用。
 - `filelib.resolver`
   - `is_same_path(path1, path2)`: 通过 `Path.resolve()` 比较是否同一路径。
+- `filelib.checker`
+  - `is_same_file(file1, file2, mode='hash')`: 通过哈希或逐字节比较两个文件。
+  - `is_same_folder(folder1, folder2, match_func=None, file_compare_mode='hash')`: 递归检查两个文件夹是否包含相同的文件。
 - `filelib.operator`
   - `remove(...)`: 删除文件/目录，支持 `dry_run`、`run_log`、`recursive`。
   - `move(...)`: 移动文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`。
@@ -46,10 +50,18 @@ user-invocable: true
   - `False`: 文件完整
   - `None` 或自定义值: 遇到不支持 MIME 且采用 `unsupported_policy='return'`
 - `downloader.download_response` 不会自动创建父目录。
+- `checker.is_same_file` 支持 `mode` 参数：`hash | full`。
+  - `'hash'`（默认）：用 SHA256 哈希比较，适配所有文件类型和大小。
+  - `'full'`：逐字节比较，更慢但完全准确。
+- `checker.is_same_folder` 递归比较两个文件夹内的所有文件。
+  - 文件按相对路径配对；相对路径要完全匹配。
+  - `match_func` 是可选过滤函数，只比较过滤后的文件。
+  - 空目录或被完全过滤的目录视为相同。
 
 ## Agent 工作流程
 1. 明确任务类型。
 - 扫描类任务优先用 `scanner.ls`。
+- 文件/文件夹比较用 `checker.is_same_file` 或 `checker.is_same_folder`。
 - 路径比较优先用 `resolver.is_same_path`。
 - 文件变更优先用 `operator.*`。
 - 下载任务用 `downloader.download_response`。

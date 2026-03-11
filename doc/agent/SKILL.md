@@ -11,6 +11,7 @@ user-invocable: true
 - You need to scan directories and filter files by custom rules.
 - You need to move, copy, or delete files and folders with conflict control.
 - You need to verify whether two paths resolve to the same real location.
+- You need to compare files or folders for identity.
 - You need to download resources to local files.
 - You need to detect corruption in common image formats.
 
@@ -20,6 +21,9 @@ user-invocable: true
   - `is_empty_dir(...)`: currently a placeholder (`...`); do not use in automated flows.
 - `filelib.resolver`
   - `is_same_path(path1, path2)`: compares paths after `Path.resolve()` normalization.
+- `filelib.checker`
+  - `is_same_file(file1, file2, mode='hash')`: compare two files for identity using hash or byte-level comparison.
+  - `is_same_folder(folder1, folder2, match_func=None, file_compare_mode='hash')`: check if two folders contain identical files recursively.
 - `filelib.operator`
   - `remove(...)`: remove files/directories with `dry_run`, `run_log`, and `recursive` controls.
   - `move(...)`: move files/directories with `exist_policy`, `make_dir`, and `dry_run` controls.
@@ -46,10 +50,18 @@ user-invocable: true
   - `False`: file is complete
   - `None` or custom value: unsupported MIME with `unsupported_policy='return'`
 - `downloader.download_response` does not create parent directories automatically.
+- `checker.is_same_file` supports `mode` values: `hash | full`.
+  - `'hash'` (default): SHA256 hash comparison, suitable for all file types and sizes.
+  - `'full'`: byte-by-byte comparison, slower but complete.
+- `checker.is_same_folder` recursively compares all files in two folders.
+  - Files are matched by relative path within their respective folders.
+  - `match_func` filters files to compare; if all filtered files match, folders are considered identical.
+  - Empty folders or folders with all files filtered out are considered identical.
 
 ## Agent Procedure
 1. Identify task category.
 - Use `scanner.ls` for discovery and filtering.
+- Use `checker.is_same_file` or `checker.is_same_folder` for file/folder comparison.
 - Use `resolver.is_same_path` for path identity checks.
 - Use `operator.*` for filesystem mutations.
 - Use `downloader.download_response` for network-to-file tasks.

@@ -3,7 +3,7 @@
 `filelib` is a lightweight Python utility library for common file workflows, including:
 - directory scanning and filtering
 - file/folder copy, move, and remove operations
-- path resolution checks
+- path resolution and file comparison checks
 - HTTP file downloads
 - basic image corruption checks
 
@@ -31,6 +31,9 @@ pip install -e .
   - `copy`: copy file/folder with destination conflict policies
 - `filelib.resolver`
   - `is_same_path`: compare two paths after `Path.resolve()` normalization
+- `filelib.checker`
+  - `is_same_file`: check if two files are identical (hash or byte-level comparison)
+  - `is_same_folder`: check if two folders contain identical files
 - `filelib.downloader`
   - `download_response`: download URL content to a file path
 - `filelib.identifier`
