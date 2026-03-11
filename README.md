@@ -238,6 +238,9 @@ deploy_filelib(
   - `<custom>` -> source `SKILL_<custom>.md`
   - deployed file is always target `SKILL.md`
 - `skill_name`: target skill directory name under `.../skills`
+  - if provided, it is authoritative and deployed `SKILL.md` front matter `name` will be aligned to it
+  - if not provided, use `name:` from selected `SKILL*.md` front matter
+  - if `name:` is missing and `skill_name` is not provided, deployment raises `ValueError`
 - `overwrite=True` replaces existing deployed folder
 - `use_symlink=True` creates a symbolic link for target `SKILL.md`
 - Deployment follows skill spec layout: `<skills_root>/<skill_name>/SKILL.md`
@@ -245,9 +248,7 @@ deploy_filelib(
 ### `skill_deployer.deploy_filelib`
 
 - Uses filelib built-in skill folder: `doc/agent`
-- If `skill_name` is not provided:
-  - first try `name:` from selected `SKILL*.md` front matter
-  - fallback to `filelib-agent`
+- Name resolution follows `deploy_skill` rules above.
 
 ## Testing
 

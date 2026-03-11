@@ -13,8 +13,14 @@ class TestDeploySkill:
     def setup_tmpdir(self, tmp_path: Path):
         self.skill_dir = tmp_path / "demo_skill"
         self.skill_dir.mkdir()
-        (self.skill_dir / "SKILL.md").write_text("# Demo skill\n")
-        (self.skill_dir / "SKILL_zh.md").write_text("# 演示技能\n")
+        (self.skill_dir / "SKILL.md").write_text(
+            "---\nname: demo-skill\n---\n\n# Demo skill\n",
+            encoding="utf-8",
+        )
+        (self.skill_dir / "SKILL_zh.md").write_text(
+            "---\nname: demo-skill\n---\n\n# 演示技能\n",
+            encoding="utf-8",
+        )
         (self.skill_dir / "notes.txt").write_text("extra content\n")
 
         self.project_root = tmp_path / "project"
@@ -31,10 +37,10 @@ class TestDeploySkill:
         )
 
         copilot_target = (
-            self.project_root / ".github" / "skills" / self.skill_dir.name
+            self.project_root / ".github" / "skills" / "demo-skill"
         ).resolve()
         claude_target = (
-            self.project_root / ".claude" / "skills" / self.skill_dir.name
+            self.project_root / ".claude" / "skills" / "demo-skill"
         ).resolve()
 
         assert deployed == {
@@ -43,7 +49,9 @@ class TestDeploySkill:
         }
         assert (copilot_target / "SKILL.md").exists()
         assert (claude_target / "SKILL.md").exists()
-        assert (copilot_target / "SKILL.md").read_text() == "# Demo skill\n"
+        assert (copilot_target / "SKILL.md").read_text(encoding="utf-8") == (
+            "---\nname: demo-skill\n---\n\n# Demo skill\n"
+        )
         assert not (copilot_target / "notes.txt").exists()
 
     def test_existing_target_without_overwrite_raises(self) -> None:
@@ -94,7 +102,9 @@ class TestDeploySkill:
         )
 
         target = Path(deployed["copilot"])
-        assert (target / "SKILL.md").read_text() == "# 演示技能\n"
+        assert (target / "SKILL.md").read_text(encoding="utf-8") == (
+            "---\nname: demo-skill\n---\n\n# 演示技能\n"
+        )
 
     def test_missing_language_version_raises(self) -> None:
         with pytest.raises(FileNotFoundError, match="Missing language skill file"):
@@ -119,6 +129,51 @@ class TestDeploySkill:
         assert target.name == "my-filelib-skill"
         assert (target / "SKILL.md").exists()
 
+    def test_custom_skill_name_overrides_front_matter_name(self) -> None:
+        (self.skill_dir / "SKILL.md").write_text(
+            "---\nname: old-name\n---\n\n# Demo skill\n",
+            encoding="utf-8",
+        )
+
+        deployed = deploy_skill(
+            skill_dir=self.skill_dir,
+            destination="project",
+            assistant="copilot",
+            skill_name="new-name",
+            project_root=self.project_root,
+        )
+
+        target_skill = Path(deployed["copilot"]) / "SKILL.md"
+        content = target_skill.read_text(encoding="utf-8")
+        assert "name: new-name" in content
+        assert "name: old-name" not in content
+
+    def test_custom_skill_name_inserts_front_matter_name_when_missing(self) -> None:
+        (self.skill_dir / "SKILL.md").write_text("# Demo skill\n", encoding="utf-8")
+
+        deployed = deploy_skill(
+            skill_dir=self.skill_dir,
+            destination="project",
+            assistant="copilot",
+            skill_name="inserted-name",
+            project_root=self.project_root,
+        )
+
+        target_skill = Path(deployed["copilot"]) / "SKILL.md"
+        content = target_skill.read_text(encoding="utf-8")
+        assert content.startswith("---\nname: inserted-name\n---\n")
+
+    def test_missing_skill_name_and_front_matter_name_raises(self) -> None:
+        (self.skill_dir / "SKILL.md").write_text("# Demo skill\n", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="skill_name is required"):
+            deploy_skill(
+                skill_dir=self.skill_dir,
+                destination="project",
+                assistant="copilot",
+                project_root=self.project_root,
+            )
+
 
 class TestDeployFilelib:
 
@@ -126,8 +181,14 @@ class TestDeployFilelib:
     def setup_tmpdir(self, tmp_path: Path):
         self.skill_dir = tmp_path / "demo_skill"
         self.skill_dir.mkdir()
-        (self.skill_dir / "SKILL.md").write_text("# Demo skill\n")
-        (self.skill_dir / "SKILL_zh.md").write_text("# 演示技能\n")
+        (self.skill_dir / "SKILL.md").write_text(
+            "---\nname: filelib-agent\n---\n\n# Demo skill\n",
+            encoding="utf-8",
+        )
+        (self.skill_dir / "SKILL_zh.md").write_text(
+            "---\nname: filelib-agent\n---\n\n# 演示技能\n",
+            encoding="utf-8",
+        )
 
         self.project_root = tmp_path / "project"
         self.project_root.mkdir()
@@ -167,7 +228,9 @@ class TestDeployFilelib:
 
         target = Path(deployed["copilot"])
         assert target.name == "filelib-agent"
-        assert (target / "SKILL.md").read_text() == "# 演示技能\n"
+        assert (target / "SKILL.md").read_text(encoding="utf-8") == (
+            "---\nname: filelib-agent\n---\n\n# 演示技能\n"
+        )
 
     def test_custom_skill_name_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(

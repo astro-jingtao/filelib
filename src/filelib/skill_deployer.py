@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
+from filelib.printer import Printer
 
 AssistantName = str
 DestinationName = str
@@ -29,15 +31,12 @@ def deploy_filelib(
     """
 
     skill_dir = _get_filelib_skill_dir()
-    source_skill_md = _resolve_source_skill_md(skill_dir, language.lower().strip())
-    resolved_skill_name = skill_name or _extract_front_matter_name(source_skill_md) or "filelib-agent"
-
     return deploy_skill(
         skill_dir=skill_dir,
         destination=destination,
         assistant=assistant,
         language=language,
-        skill_name=resolved_skill_name,
+        skill_name=skill_name,
         project_root=project_root,
         overwrite=overwrite,
         use_symlink=use_symlink,
@@ -76,7 +75,9 @@ def deploy_skill(
         The selected source file is always deployed as ``SKILL.md``.
     skill_name : str | None, default None
         Target skill directory name under ``.../skills``.
-        If None, use ``skill_dir`` folder name.
+        If provided, it is treated as the authoritative name and the deployed
+        ``SKILL.md`` front matter ``name`` will be aligned to it.
+        If None, use ``name:`` from selected source ``SKILL*.md`` front matter.
     project_root : str | Path | None, default None
         Required when ``destination='project'`` if current working directory
         is not the desired project root.
@@ -100,13 +101,44 @@ def deploy_skill(
         If target already exists and ``overwrite=False``.
     """
 
+    printer = Printer(dry_run=False, run_log=False, verbose=False, ignore_warning=False)
+
     skill_path = Path(skill_dir).expanduser().resolve()
     if not skill_path.exists() or not skill_path.is_dir():
-        raise FileNotFoundError(f"Skill directory does not exist: {skill_path}")
+        raise FileNotFoundError(
+            f"Skill directory does not exist: {skill_path}")
 
     language = language.lower().strip()
     source_skill_md = _resolve_source_skill_md(skill_path, language)
-    resolved_skill_name = _validate_skill_name(skill_name) if skill_name else skill_path.name
+    source_text = source_skill_md.read_text(encoding="utf-8")
+    md_name = _extract_front_matter_name_from_text(source_text)
+
+    if skill_name is not None:
+        give_name = _validate_skill_name(skill_name)
+        resolved_skill_name = give_name
+        if md_name == give_name:
+            deployed_text = source_text
+        else:
+            deployed_text = _ensure_front_matter_name(source_text, give_name)
+    else:
+        if not md_name:
+            raise ValueError(
+                "skill_name is required when selected SKILL*.md has no front matter name"
+            )
+        resolved_skill_name = md_name
+        deployed_text = source_text
+
+    # only use symlink if user want to do and source and target are the same
+    if use_symlink:
+        if deployed_text == source_text:
+            can_symlink = True
+        else:
+            printer.print_warning(
+                "Cannot use symlink because deployed content differs from source. Falling back to copy."
+            )
+            can_symlink = False
+    else:
+        can_symlink = False
 
     destination = destination.lower().strip()
     assistant = assistant.lower().strip()
@@ -125,7 +157,8 @@ def deploy_skill(
     if destination == "home":
         root = Path.home()
     else:
-        root = Path(project_root).expanduser().resolve() if project_root else Path.cwd()
+        root = Path(project_root).expanduser().resolve(
+        ) if project_root else Path.cwd()
 
     if destination == "project" and not root.exists():
         raise FileNotFoundError(f"Project root does not exist: {root}")
@@ -140,7 +173,12 @@ def deploy_skill(
         )
 
         _prepare_target(target, overwrite=overwrite)
-        _deploy_skill_spec(source_skill_md, target, use_symlink=use_symlink)
+        _deploy_skill_spec(
+            target,
+            source_skill_md=source_skill_md,
+            deployed_text=deployed_text,
+            use_symlink=can_symlink,
+        )
         deployed_paths[item] = str(target)
 
     return deployed_paths
@@ -176,7 +214,12 @@ def _prepare_target(target: Path, overwrite: bool) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _deploy_skill_spec(source_skill_md: Path, target: Path, use_symlink: bool) -> None:
+def _deploy_skill_spec(
+    target: Path,
+    source_skill_md: Path,
+    deployed_text: str,
+    use_symlink: bool,
+) -> None:
     target.mkdir(parents=True, exist_ok=True)
     target_skill_md = target / "SKILL.md"
 
@@ -188,7 +231,49 @@ def _deploy_skill_spec(source_skill_md: Path, target: Path, use_symlink: bool) -
                 "Failed to create symlink. On Windows, enable Developer Mode or run with admin privileges."
             ) from exc
     else:
-        shutil.copy2(source_skill_md, target_skill_md)
+        target_skill_md.write_text(deployed_text, encoding="utf-8")
+
+
+def _ensure_front_matter_name(content: str, skill_name: str) -> str:
+    front_matter_pattern = re.compile(r"\A---\n(.*?)\n---\n?", re.DOTALL)
+    match = front_matter_pattern.match(content)
+
+    if not match:
+        header = f"---\nname: {skill_name}\n---\n\n"
+        return header + content
+
+    front_matter = match.group(1)
+    body = content[match.end():]
+    lines = front_matter.splitlines()
+
+    updated = False
+    for idx, line in enumerate(lines):
+        if re.match(r"^\s*name\s*:", line):
+            lines[idx] = f"name: {skill_name}"
+            updated = True
+            break
+
+    if not updated:
+        lines.append(f"name: {skill_name}")
+
+    normalized_front_matter = "\n".join(lines)
+    return f"---\n{normalized_front_matter}\n---\n{body}"
+
+
+def _extract_front_matter_name_from_text(content: str) -> str | None:
+    lines = content.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped == "---":
+            break
+        if stripped.startswith("name:"):
+            value = stripped.split(":", 1)[1].strip().strip("\"'")
+            return _validate_skill_name(value) if value else None
+
+    return None
 
 
 def _resolve_source_skill_md(skill_path: Path, language: str) -> Path:
@@ -202,27 +287,16 @@ def _resolve_source_skill_md(skill_path: Path, language: str) -> Path:
     if candidate.exists() and candidate.is_file():
         return candidate
 
-    available = sorted(path.name for path in skill_path.glob("SKILL*.md") if path.is_file())
+    available = sorted(path.name for path in skill_path.glob("SKILL*.md")
+                       if path.is_file())
     raise FileNotFoundError(
         f"Missing language skill file: {candidate}. "
-        f"Available versions in {skill_path}: {available or ['SKILL.md']}"
-    )
+        f"Available versions in {skill_path}: {available or ['SKILL.md']}")
 
 
 def _extract_front_matter_name(skill_md: Path) -> str | None:
-    lines = skill_md.read_text(encoding="utf-8").splitlines()
-    if not lines or lines[0].strip() != "---":
-        return None
-
-    for line in lines[1:]:
-        stripped = line.strip()
-        if stripped == "---":
-            break
-        if stripped.startswith("name:"):
-            value = stripped.split(":", 1)[1].strip().strip("\"'")
-            return _validate_skill_name(value) if value else None
-
-    return None
+    return _extract_front_matter_name_from_text(
+        skill_md.read_text(encoding="utf-8"))
 
 
 def _validate_skill_name(skill_name: str) -> str:
