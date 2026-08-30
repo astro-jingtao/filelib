@@ -26,8 +26,8 @@ user-invocable: true
   - `is_same_folder(folder1, folder2, match_func=None, file_compare_mode='hash')`: check if two folders contain identical files recursively.
 - `filelib.operator`
   - `remove(...)`: remove files/directories with `dry_run`, `run_log`, and `recursive` controls.
-  - `move(...)`: move files/directories with `exist_policy`, `make_dir`, and `dry_run` controls.
-  - `copy(...)`: copy files/directories with `exist_policy`, `make_dir`, and `dry_run` controls.
+  - `move(...)`: move files/directories with `exist_policy`, `make_dir`, and `dry_run` controls; `retarget_symlinks=True` retargets in-tree absolute links after a move.
+  - `copy(...)`: copy files/directories with `exist_policy`, `make_dir`, and `dry_run` controls; `preserve_symlinks=True` keeps symlinks as links, `retarget_symlinks=True` rewrites in-tree absolute targets in the copy.
   - `merge_folders(src, dst, dry_run=False, run_log=False)`: one-way merge of `src` into `dst`; never overwrites (skip on same SHA-256, auto-rename on conflict); returns `{'copied', 'skipped', 'renamed'}` statistics.
 - `filelib.downloader`
   - `download_response(...)`: download HTTP response content to local file, returns status code.
@@ -46,6 +46,13 @@ user-invocable: true
 - `operator.remove` supports `recursive` values: `True | False | 'skip'`.
 - `operator.move/copy` supports `exist_policy` values: `default | overwrite | rename`.
 - `operator.move/copy` requires `make_dir=True` when destination parent does not exist.
+- `operator.move/copy` `exist_policy` applies only when `dst` exists as a file; it is ignored for missing/directory `dst`.
+- `operator.copy` `preserve_symlinks` (default `False`) — with `True` symlinks are kept as links (a symlink `src` recreated with its original target; inner links of a tree recreated as links).
+- `operator.move/copy` `retarget_symlinks` (default `False`) — with a real-directory `src`, absolute link targets inside `src` are rewritten to the corresponding location under `dst` after the copy/move; relative and outside-tree links are kept verbatim; single symlinks are never retargeted.
+  - On `copy` it requires `preserve_symlinks=True`; otherwise a warning is printed and nothing is retargeted.
+  - On `move` links are preserved by `shutil.move` itself regardless; the flag only adds retargeting.
+  - Privilege pre-check: if links would be created/rewritten, rights are probed before any filesystem change; missing rights raise `PermissionError` (also in `dry_run`).
+  - `dry_run=True` previews rewrites as `[RETARGET] <link>: <old> -> <new>`.
 - `identifier.is_file_corrupted` return semantics:
   - `True`: file is corrupted
   - `False`: file is complete
@@ -169,6 +176,23 @@ from filelib.operator import merge_folders
 stats = merge_folders('incoming', 'archive', dry_run=True)   # preview
 stats = merge_folders('incoming', 'archive', run_log=True)   # execute
 print(stats)
+```
+
+### 7) Copy/move a folder while preserving symbolic links
+```python
+from filelib.operator import copy, move
+
+# Preview: prints [dry-run] [RETARGET] lines, and raises PermissionError
+# here already if links could not be created in this environment
+copy('game/mod', 'backup/mod', preserve_symlinks=True,
+     retarget_symlinks=True, dry_run=True)
+
+# Copy: links stay links; absolute in-tree targets now point inside the copy
+copy('game/mod', 'backup/mod', preserve_symlinks=True,
+     retarget_symlinks=True, run_log=True)
+
+# Move: links are preserved by the move itself; retarget fixes in-tree links
+move('game/mod', 'backup/mod', retarget_symlinks=True, run_log=True)
 ```
 
 ## Failure Handling

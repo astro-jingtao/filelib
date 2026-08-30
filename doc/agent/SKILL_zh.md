@@ -26,8 +26,8 @@ user-invocable: true
   - `is_same_folder(folder1, folder2, match_func=None, file_compare_mode='hash')`: 递归检查两个文件夹是否包含相同的文件。
 - `filelib.operator`
   - `remove(...)`: 删除文件/目录，支持 `dry_run`、`run_log`、`recursive`。
-  - `move(...)`: 移动文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`。
-  - `copy(...)`: 复制文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`。
+  - `move(...)`: 移动文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`；`retarget_symlinks=True` 移动后重映射树内绝对链接。
+  - `copy(...)`: 复制文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`；`preserve_symlinks=True` 将符号链接保留为链接，`retarget_symlinks=True` 重映射副本中的树内绝对链接。
   - `merge_folders(src, dst, dry_run=False, run_log=False)`: 将 `src` 单向合并进 `dst`；永不覆盖（SHA-256 相同跳过，冲突自动改名）；返回 `{'copied', 'skipped', 'renamed'}` 统计。
 - `filelib.downloader`
   - `download_response(...)`: HTTP 下载到本地文件，返回状态码。
@@ -46,6 +46,13 @@ user-invocable: true
 - `operator.remove` 的 `recursive` 支持 `True | False | 'skip'`。
 - `operator.move/copy` 的 `exist_policy` 只支持 `default | overwrite | rename`。
 - `operator.move/copy` 在目标父目录不存在时，需显式设置 `make_dir=True`。
+- `operator.move/copy` 的 `exist_policy` 仅在 `dst` 是已存在**文件**时生效；`dst` 不存在或是目录时被忽略。
+- `operator.copy` 的 `preserve_symlinks`（默认 `False`）——开启后符号链接保留为链接（符号链接 `src` 按原目标重建；树内链接也重建为链接）。
+- `operator.move/copy` 的 `retarget_symlinks`（默认 `False`）——对真实目录 `src`，复制/移动后把绝对目标落在 `src` 内的链接重写到 `dst` 下对应位置；相对链接和树外链接保持原样；单个符号链接从不重映射。
+  - 在 `copy` 上需要同时 `preserve_symlinks=True`，否则打印警告且不做任何重映射。
+  - 在 `move` 上链接本就由 `shutil.move` 保留，该标志只增加重映射。
+  - 权限预检：将创建/重写链接时，会在任何文件系统变更前探测权限；无权限直接抛 `PermissionError`（`dry_run` 下同样抛出）。
+  - `dry_run=True` 会以 `[RETARGET] <链接>: <旧目标> -> <新目标>` 预览重写。
 - `identifier.is_file_corrupted` 的返回语义是:
   - `True`: 文件损坏
   - `False`: 文件完整
@@ -169,6 +176,23 @@ from filelib.operator import merge_folders
 stats = merge_folders('incoming', 'archive', dry_run=True)   # 预演
 stats = merge_folders('incoming', 'archive', run_log=True)   # 执行
 print(stats)
+```
+
+### 7) 保留符号链接地复制/移动目录
+```python
+from filelib.operator import copy, move
+
+# 预演：对将被重写的链接输出 [dry-run] [RETARGET] 行；
+# 若当前环境无法创建链接，预演阶段就会抛 PermissionError
+copy('game/mod', 'backup/mod', preserve_symlinks=True,
+     retarget_symlinks=True, dry_run=True)
+
+# 复制：链接保持为链接；树内绝对链接目标改指副本内对应位置
+copy('game/mod', 'backup/mod', preserve_symlinks=True,
+     retarget_symlinks=True, run_log=True)
+
+# 移动：链接本就随移动保留；retarget 负责修复树内绝对链接
+move('game/mod', 'backup/mod', retarget_symlinks=True, run_log=True)
 ```
 
 ## 失败处理建议

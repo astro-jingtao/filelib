@@ -27,8 +27,8 @@ pip install -e .
   - `ls`: list files with filter, recursion, and path formatting options
 - `filelib.operator`
   - `remove`: delete file/folder with `recursive` control
-  - `move`: move path with destination conflict policies
-  - `copy`: copy file/folder with destination conflict policies
+  - `move`: move path with destination conflict policies; `retarget_symlinks` retargets in-tree absolute links after a move
+  - `copy`: copy file/folder with destination conflict policies; `preserve_symlinks` keeps symlinks as links, `retarget_symlinks` rewrites in-tree absolute targets in the copy
   - `merge_folders`: one-way merge `src` into `dst` without overwriting (SHA-256 dedupe, auto-rename on conflict)
 - `filelib.resolver`
   - `is_same_path`: compare two paths after `Path.resolve()` normalization
@@ -195,6 +195,26 @@ stats = merge_folders(src="backup/photos", dst="library/photos", run_log=True)
 print(stats)
 ```
 
+### 8) Copy/move a folder while preserving symbolic links
+
+```python
+from filelib.operator import copy, move
+
+# Preview first: prints [dry-run] [RETARGET] lines for links that will be
+# rewritten (also raises PermissionError here if links could not be created)
+copy(src="game/mod", dst="backup/mod", preserve_symlinks=True,
+     retarget_symlinks=True, dry_run=True)
+
+# Copy: symlinks are recreated as symlinks; links whose absolute targets
+# point inside "game/mod" are retargeted to point inside "backup/mod"
+copy(src="game/mod", dst="backup/mod", preserve_symlinks=True,
+     retarget_symlinks=True, run_log=True)
+
+# Move: links are always preserved by the move itself; retarget_symlinks
+# additionally fixes absolute in-tree links, which would otherwise dangle
+move(src="game/mod", dst="backup/mod", retarget_symlinks=True, run_log=True)
+```
+
 ## API Notes and Behaviors
 
 ### `scanner.ls`
@@ -228,6 +248,13 @@ print(stats)
   - `overwrite`: remove existing destination file first
   - `rename`: auto-generate destination suffix (`_0`, `_1`, ...)
 - `make_dir=True` creates missing destination parent directories.
+- `exist_policy` applies only when `dst` exists as a **file**; when `dst` is missing or an existing directory it is ignored (file/directory `src` is then placed into `dst/<basename(src)>`, or `copytree` raises `FileExistsError` for a directory `src` onto an existing directory).
+- `preserve_symlinks` (`copy` only, default `False`): symlinks are kept as links instead of followed — a symlink `src` is recreated at `dst` with its original target, and links inside a copied directory tree are recreated as links (original targets unchanged).
+- `retarget_symlinks` (`copy` and `move`, default `False`): with a real-directory `src`, links whose absolute targets lie inside `src` are rewritten to the corresponding location under `dst` after the copy/move. Relative links and links pointing outside the tree are kept verbatim. Single symlinks are never retargeted — only the link itself is copied/moved while its target stays valid where it is; retargeting is only sound when the whole tree containing both the link and its target is transported.
+  - On `copy` it requires `preserve_symlinks=True`; otherwise a warning is printed and nothing is retargeted.
+  - On `move` links are preserved by `shutil.move` itself regardless of the flag; the flag only adds retargeting (fixing links that would dangle after the move).
+- Privilege pre-check: if the operation would create or rewrite at least one link, symlink-creation rights are probed **before any filesystem change**; a missing right raises `PermissionError` — in `dry_run` mode too, so previews double as feasibility checks.
+- `dry_run=True` previews each rewrite as `[RETARGET] <link>: <old> -> <new>`.
 
 ### `operator.merge_folders`
 
@@ -293,3 +320,7 @@ pytest -q
 - `scanner.is_empty_dir` is currently a placeholder and not implemented.
 - `download_response` does not create parent directories automatically.
 - `merge_folders` follows directory symlinks while scanning; symlink cycles are not detected and can cause duplicated traversal or statistics.
+- `move` preserves symlinks inherently (`shutil.move` behavior); `retarget_symlinks=True` only adds the in-tree retargeting pass.
+- With `preserve_symlinks=True` and `exist_policy="default"`, copying a single symlink onto an existing file raises `FileExistsError` instead of silently overwriting (plain `copy2` would overwrite).
+- Absolute links pointing outside the source tree are kept verbatim by the symlink flags and may dangle after a move.
+- An existing destination that is a symlink is not handled by `exist_policy` (it only distinguishes file vs directory).

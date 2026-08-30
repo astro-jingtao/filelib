@@ -1,5 +1,7 @@
 # pylint: disable=attribute-defined-outside-init
 
+import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -212,6 +214,80 @@ class TestMove:
         assert not self.src_file.exists()
         assert moved_file.exists()
         assert moved_file.read_text() == "source content"
+
+    def test_move_file_to_existing_file_default_overwrites(self):
+        """Docstring (move, table): file src + existing file dst +
+        exist_policy='default' -> overwritten (shutil.move's copy2
+        fallback; os.rename cannot replace on Windows)."""
+        dst_file = self.dst_dir / "source.txt"
+        dst_file.write_text("old content")
+
+        move(str(self.src_file), str(dst_file))
+
+        assert dst_file.read_text() == "source content"
+        assert not self.src_file.exists()
+
+    def test_move_directory_success(self):
+        """Docstring (move, table): directory src + missing dst ->
+        whole tree moved."""
+        dst = self.test_dir / "moved_folder"
+
+        move(str(self.src_dir), str(dst))
+
+        assert not self.src_dir.exists()
+        assert (dst / "source.txt").read_text() == "source content"
+
+    def test_move_directory_to_existing_dir_lands_inside(self):
+        """Docstring (move, table): directory src + existing dir dst ->
+        tree lands at dst/<basename(src)>."""
+        dst = self.test_dir / "container"
+        dst.mkdir()
+
+        move(str(self.src_dir), str(dst))
+
+        assert (dst / "src" / "source.txt").read_text() == "source content"
+
+    def test_move_directory_to_existing_dir_conflict_raises_shutil_error(self):
+        """Docstring (move, Raises): dst is an existing directory and
+        dst/<basename(src)> already exists -> shutil.Error."""
+        dst = self.test_dir / "container"
+        (dst / "src").mkdir(parents=True)
+
+        with pytest.raises(shutil.Error):
+            move(str(self.src_dir), str(dst))
+
+    def test_move_directory_to_existing_file_default_raises(self):
+        """Docstring (move, table): directory src + existing file dst +
+        'default' -> FileExistsError, source untouched."""
+        dst = self.test_dir / "blocker.txt"
+        dst.write_text("block")
+
+        with pytest.raises(FileExistsError):
+            move(str(self.src_dir), str(dst))
+
+        assert self.src_file.exists()
+
+    def test_move_directory_to_existing_file_overwrite(self):
+        """Docstring (move, table): directory src + existing file dst +
+        'overwrite' -> file removed first, then tree moved."""
+        dst = self.test_dir / "blocker.txt"
+        dst.write_text("block")
+
+        move(str(self.src_dir), str(dst), exist_policy='overwrite')
+
+        assert dst.is_dir()
+        assert (dst / "source.txt").read_text() == "source content"
+
+    def test_move_directory_to_existing_file_rename(self):
+        """Docstring (move, table): directory src + existing file dst +
+        'rename' -> tree moved to stem_0.ext."""
+        dst = self.test_dir / "blocker.txt"
+        dst.write_text("block")
+
+        move(str(self.src_dir), str(dst), exist_policy='rename')
+
+        assert dst.read_text() == "block"
+        assert (self.test_dir / "blocker_0.txt" / "source.txt").is_file()
 
     def test_move_make_dir_true_creates_parent(self):
         """make_dir=True 时自动创建父目录并移动"""
@@ -464,6 +540,54 @@ class TestCopy:
         assert "exist_policy must be" in str(excinfo.value)
         assert self.src_file.exists()
 
+    def test_copy_file_to_existing_file_default_overwrites(self):
+        """Docstring (copy, table): file src + existing file dst +
+        exist_policy='default' -> silently overwritten by copy2."""
+        dst_file = self.dst_dir / "source.txt"
+        dst_file.write_text("old")
+
+        copy(str(self.src_file), str(dst_file))
+
+        assert dst_file.read_text() == "source content"
+
+    def test_copy_directory_to_existing_file_default_raises(self):
+        """Docstring (copy, table/Raises): directory src + existing file
+        dst + 'default' -> FileExistsError from copytree."""
+        dst = self.dst_dir / "blocker.txt"
+        dst.write_text("block")
+
+        with pytest.raises(FileExistsError):
+            copy(str(self.src_folder), str(dst))
+
+    def test_copy_directory_to_existing_file_overwrite(self):
+        """Docstring (copy, table): directory src + existing file dst +
+        'overwrite' -> file removed first, then copytree."""
+        dst = self.dst_dir / "blocker.txt"
+        dst.write_text("block")
+
+        copy(str(self.src_folder), str(dst), exist_policy='overwrite')
+
+        assert dst.is_dir()
+        assert (dst / "inner.txt").read_text() == "inner content"
+
+    def test_copy_directory_to_existing_file_rename(self):
+        """Docstring (copy, table): directory src + existing file dst +
+        'rename' -> copytree to stem_0.ext."""
+        dst = self.dst_dir / "blocker.txt"
+        dst.write_text("block")
+
+        copy(str(self.src_folder), str(dst), exist_policy='rename')
+
+        assert dst.read_text() == "block"
+        assert (self.dst_dir / "blocker_0.txt" / "inner.txt").is_file()
+
+    def test_copy_directory_to_existing_dir_raises(self):
+        """Docstring (copy, table): directory src + existing dir dst ->
+        FileExistsError from copytree (exist_policy ignored for
+        directory destinations)."""
+        with pytest.raises(FileExistsError):
+            copy(str(self.src_folder), str(self.dst_dir))
+
     def test_copy_dry_run_no_fs_change(self, capsys):
         """dry_run=True：不执行真实复制，但输出 dry-run 日志"""
         dst_file = self.dst_dir / "dry_copied.txt"
@@ -577,6 +701,621 @@ class TestCopy:
         assert calls["src"] == str(self.src_folder)
         assert calls["dst"] == str(dst_folder)
         assert calls["copy_function"] is fake_copy_function
+
+
+def _make_link_or_skip(link_path: Path,
+                       target: str,
+                       target_is_directory: bool = False) -> None:
+    """Create a symlink, skipping on Windows without link privilege."""
+    try:
+        link_path.symlink_to(target, target_is_directory=target_is_directory)
+    except OSError as exc:
+        # Windows without symlink privilege (no admin or no developer
+        # mode) commonly raises WinError 1314.
+        if os.name == "nt" and getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows symlink requires admin/developer mode (WinError 1314)")
+        raise
+
+
+def _readlink_clean(link_path: Path) -> str:
+    """os.readlink with the Windows ``\\?\\`` long-path prefix stripped.
+
+    Python's readlink on Windows can return targets with a ``\\?\\``
+    prefix even when the link was created without one.
+    """
+    return os.readlink(str(link_path)).removeprefix("\\\\?\\")
+
+
+class TestMapLinkTarget:
+    """Tests for the pure string-math _map_link_target helper.
+
+    No symlink privilege is required to run these.
+    """
+
+    def test_target_inside_src_is_remapped(self):
+        """Docstring (_map_link_target): absolute target inside src_root
+        is remapped to the same relative location under dst_root."""
+        result = operator_module._map_link_target(
+            r"C:\root\src_dir\sub\real.txt", r"C:\root\src_dir", r"D:\backup\copy")
+        assert os.path.normpath(result) == \
+            os.path.normpath(r"D:\backup\copy\sub\real.txt")
+
+    def test_target_equal_to_src_root_maps_to_dst_root(self):
+        """Docstring (_map_link_target): target == src_root itself maps
+        to dst_root (edge case, must not crash)."""
+        result = operator_module._map_link_target(
+            r"C:\root\src_dir", r"C:\root\src_dir", r"D:\dst")
+        assert os.path.normpath(result) == os.path.normpath(r"D:\dst")
+
+    def test_target_outside_src_unchanged(self):
+        """Docstring (_map_link_target): absolute target outside src_root
+        is returned verbatim."""
+        target = r"C:\root\external\file.txt"
+        result = operator_module._map_link_target(
+            target, r"C:\root\src_dir", r"D:\dst")
+        assert result == target
+
+    def test_relative_target_unchanged(self):
+        """Docstring (_map_link_target): relative targets are returned
+        verbatim (they still resolve correctly after a tree move)."""
+        result = operator_module._map_link_target(
+            "real.txt", r"C:\root\src_dir", r"D:\dst")
+        assert result == "real.txt"
+
+    def test_cross_drive_target_unchanged(self):
+        """Docstring (_map_link_target): cross-drive targets are returned
+        verbatim (commonpath raises ValueError internally)."""
+        target = r"D:\other\file.txt"
+        result = operator_module._map_link_target(
+            target, r"C:\root\src_dir", r"D:\dst")
+        assert result == target
+
+    def test_windows_long_path_prefix_preserved(self):
+        """Docstring (_map_link_target): the Windows \\\\?\\ long-path
+        prefix survives the mapping."""
+        target = r"\\?\C:\root\src_dir\sub\real.txt"
+        result = operator_module._map_link_target(
+            target, r"C:\root\src_dir", r"D:\dst")
+        assert result.startswith("\\\\?\\")
+        assert os.path.normpath(result.removeprefix("\\\\?\\")) == \
+            os.path.normpath(r"D:\dst\sub\real.txt")
+
+    def test_nonexistent_src_root_still_works(self):
+        """Docstring (_map_link_target): pure string math — works after
+        a same-drive move when src_root no longer exists."""
+        result = operator_module._map_link_target(
+            r"C:\gone\src_dir\sub\real.txt", r"C:\gone\src_dir", r"D:\dst")
+        assert os.path.normpath(result) == os.path.normpath(r"D:\dst\sub\real.txt")
+
+
+class TestCopySymlinks:
+    """Tests for copy's preserve_symlinks flag."""
+
+    @pytest.fixture(autouse=True)
+    def setup_tree(self, tmp_path: Path) -> None:
+        self.root = tmp_path / "link_root"
+        self.root.mkdir()
+
+        self.external = self.root / "external"
+        self.external.mkdir()
+        (self.external / "outside.txt").write_text("outside")
+
+        self.src_dir = self.root / "src_dir"
+        (self.src_dir / "sub").mkdir(parents=True)
+        (self.src_dir / "real.txt").write_text("real")
+        (self.src_dir / "sub" / "nested.txt").write_text("nested")
+
+        # absolute target inside src -> retargeted
+        self.link_file = self.src_dir / "link_file"
+        _make_link_or_skip(self.link_file, str(self.src_dir / "real.txt"))
+        # absolute dir target inside src -> retargeted
+        self.link_dir = self.src_dir / "link_dir"
+        _make_link_or_skip(self.link_dir, str(self.src_dir / "sub"),
+                           target_is_directory=True)
+        # absolute target outside src -> verbatim
+        self.link_ext = self.src_dir / "link_ext"
+        _make_link_or_skip(self.link_ext, str(self.external / "outside.txt"))
+        # relative target -> verbatim
+        self.link_rel = self.src_dir / "link_rel"
+        _make_link_or_skip(self.link_rel, "real.txt")
+
+        self.dst = self.root / "dst"
+
+        yield
+
+    def test_default_follows_symlinks(self, capsys):
+        """Default off: symlinks are dereferenced and copied as content."""
+        copy(str(self.src_dir), str(self.dst))
+
+        assert not (self.dst / "link_file").is_symlink()
+        assert (self.dst / "link_file").is_file()
+        assert not (self.dst / "link_dir").is_symlink()
+        assert (self.dst / "link_dir").is_dir()
+        assert (self.dst / "link_dir" / "nested.txt").read_text() == "nested"
+
+        captured = capsys.readouterr()
+        assert "[RETARGET]" not in captured.out
+
+    def test_preserve_and_retarget_keeps_links_and_retargets(self):
+        """Docstring (copy, flags table): preserve + retarget on a
+        directory tree -> links kept as links; absolute in-tree targets
+        rewritten to the copy; outside/relative links verbatim."""
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
+             retarget_symlinks=True)
+
+        dst_link_file = self.dst / "link_file"
+        dst_link_dir = self.dst / "link_dir"
+        assert dst_link_file.is_symlink()
+        assert dst_link_dir.is_symlink()
+
+        # in-tree absolute targets are retargeted to the copy
+        assert os.path.normpath(_readlink_clean(dst_link_file)) == \
+            os.path.normpath(str(self.dst / "real.txt"))
+        # the dir link resolves inside the copy (not dangling)
+        assert dst_link_dir.resolve() == (self.dst / "sub").resolve()
+
+        # outside / relative targets still resolve as before (not retargeted)
+        assert (self.dst / "link_ext").resolve() == \
+            (self.external / "outside.txt").resolve()
+        assert (self.dst / "link_rel").resolve() == \
+            (self.dst / "real.txt").resolve()
+
+    @pytest.mark.skipif(os.name != "nt", reason="Windows \\\\?\\ prefix semantics")
+    def test_preserve_keeps_windows_long_path_prefix(self):
+        """Docstring (copy, preserve_symlinks param): retargeting keeps
+        the Windows \\\\?\\ long-path prefix on remapped targets."""
+        long_target = "\\\\?\\" + str(self.src_dir / "real.txt")
+        _make_link_or_skip(self.src_dir / "link_long", long_target)
+
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
+             retarget_symlinks=True)
+
+        new_target = os.readlink(str(self.dst / "link_long"))
+        assert new_target.startswith("\\\\?\\")
+        assert os.path.normpath(new_target.removeprefix("\\\\?\\")) == \
+            os.path.normpath(str(self.dst / "real.txt"))
+
+    def test_single_symlink_file_copy_flag_on_recreates_link(self):
+        """Docstring (copy, flags table): symlink src + preserve on ->
+        recreated as a link with the original target, never retargeted."""
+        link = self.root / "single_link"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst_link = self.root / "single_link_copied"
+
+        copy(str(link), str(dst_link), preserve_symlinks=True)
+
+        assert dst_link.is_symlink()
+        assert os.path.normpath(_readlink_clean(dst_link)) == \
+            os.path.normpath(str(self.src_dir / "real.txt"))
+
+    def test_single_symlink_file_copy_flag_off_copies_content(self):
+        """Docstring (copy, flags table): symlink src + flags off ->
+        followed; dst is a real file with the target's content (copy2
+        follows symlinks)."""
+        link = self.root / "single_link"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst_link = self.root / "single_link_copied"
+
+        copy(str(link), str(dst_link))
+
+        assert not dst_link.is_symlink()
+        assert dst_link.read_text() == "real"
+
+    def test_single_symlink_dir_copy_flag_on_recreates_link(self):
+        """Docstring (copy, flags table): directory-link src + preserve
+        on -> recreated as a link (not a real directory copy)."""
+        link = self.root / "single_dlink"
+        _make_link_or_skip(link, str(self.src_dir / "sub"),
+                           target_is_directory=True)
+        dst_link = self.root / "single_dlink_copied"
+
+        copy(str(link), str(dst_link), preserve_symlinks=True)
+
+        assert dst_link.is_symlink()
+        assert dst_link.resolve() == (self.src_dir / "sub").resolve()
+
+    def test_single_symlink_copy_into_existing_dir(self):
+        """Docstring (copy, dst param): symlink src + existing dir dst ->
+        the link is recreated inside it as dst/<basename(src)>."""
+        link = self.root / "single_link"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        self.dst.mkdir()
+
+        copy(str(link), str(self.dst), preserve_symlinks=True)
+
+        assert (self.dst / "single_link").is_symlink()
+
+    def test_symlink_to_existing_file_default_preserve_on_raises(self):
+        """Docstring (copy, table/Raises): symlink src + existing file
+        dst + 'default' + preserve on -> FileExistsError from os.symlink
+        (plain copy2 would silently overwrite)."""
+        link = self.root / "single_link2"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        with pytest.raises(FileExistsError):
+            copy(str(link), str(dst), preserve_symlinks=True)
+
+        assert dst.read_text() == "block"
+        assert link.is_symlink()
+
+    def test_symlink_to_existing_file_default_preserve_off_overwrites(self):
+        """Docstring (copy, table): symlink src + existing file dst +
+        'default' + preserve off -> copy2 follows the link and
+        overwrites the file with the target's content."""
+        link = self.root / "single_link2"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        copy(str(link), str(dst))
+
+        assert not dst.is_symlink()
+        assert dst.read_text() == "real"
+
+    def test_symlink_to_existing_file_overwrite_preserve_on(self):
+        """Docstring (copy, table): symlink src + existing file dst +
+        'overwrite' + preserve on -> file removed first, link recreated."""
+        link = self.root / "single_link2"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        copy(str(link), str(dst), exist_policy='overwrite',
+             preserve_symlinks=True)
+
+        assert dst.is_symlink()
+        assert dst.resolve() == (self.src_dir / "real.txt").resolve()
+
+    def test_default_copytree_raises_on_dangling_link(self):
+        """Docstring (copy, flags table): directory tree containing a
+        dangling link + flags off -> copytree follows the link and
+        raises shutil.Error."""
+        _make_link_or_skip(self.src_dir / "link_dangling",
+                           str(self.root / "gone.txt"))
+
+        with pytest.raises(shutil.Error):
+            copy(str(self.src_dir), str(self.dst))
+
+    def test_dry_run_previews_retargets(self, capsys):
+        """Docstring (copy, Notes): dry_run prints
+        '[dry-run] [RETARGET] ...' for every link that would be
+        rewritten, and creates nothing."""
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
+             retarget_symlinks=True, dry_run=True)
+
+        assert not self.dst.exists()
+        captured = capsys.readouterr()
+        assert "[dry-run] [RETARGET]" in captured.out
+
+    def test_run_log_reports_retargets(self, capsys):
+        """Docstring (copy, run_log param): a real run prints one
+        '[RETARGET]' line per rewritten link when run_log=True."""
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
+             retarget_symlinks=True, run_log=True)
+
+        captured = capsys.readouterr()
+        assert "[RETARGET]" in captured.out
+        assert "[dry-run]" not in captured.out
+
+    def test_preserve_without_retarget_keeps_original_targets(self):
+        """Docstring (copy, flags table): preserve on + retarget off ->
+        inner links kept as links with their original targets
+        unchanged (still pointing into the source)."""
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True)
+
+        dst_link_file = self.dst / "link_file"
+        assert dst_link_file.is_symlink()
+        # original absolute target kept: still points into the source
+        assert os.path.normpath(_readlink_clean(dst_link_file)) == \
+            os.path.normpath(str(self.src_dir / "real.txt"))
+        assert dst_link_file.resolve() == \
+            (self.src_dir / "real.txt").resolve()
+
+    def test_retarget_without_preserve_warns_and_does_nothing(self, capsys):
+        """Docstring (copy, retarget_symlinks param / Notes):
+        retarget_symlinks=True without preserve_symlinks=True prints a
+        warning, follows the links and retargets nothing."""
+        copy(str(self.src_dir), str(self.dst), retarget_symlinks=True)
+
+        # links followed (real files in dst), nothing retargeted
+        assert not (self.dst / "link_file").is_symlink()
+        assert (self.dst / "link_file").is_file()
+
+        captured = capsys.readouterr()
+        assert "Warning" in captured.out
+        assert "retarget_symlinks" in captured.out
+        assert "[RETARGET]" not in captured.out
+
+    def test_preserve_passes_symlinks_true_to_copytree(self, monkeypatch):
+        """Docstring (copy, preserve_symlinks param): a directory copy
+        with preserve on passes symlinks=True to copytree (links are
+        recreated as links, not followed)."""
+        calls = {}
+
+        def fake_copytree(src, dst, copy_function=None, symlinks=False):
+            calls["symlinks"] = symlinks
+            return dst
+
+        monkeypatch.setattr(operator_module.shutil, "copytree", fake_copytree)
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True)
+
+        assert calls["symlinks"] is True
+
+    def test_default_passes_no_symlinks_kwarg_to_copytree(self, monkeypatch):
+        """Docstring (copy): flags off -> copytree is called with its
+        default symlinks=False (current behavior unchanged)."""
+        calls = {}
+
+        def fake_copytree(src, dst, copy_function=None, symlinks=False):
+            calls["symlinks"] = symlinks
+            return dst
+
+        monkeypatch.setattr(operator_module.shutil, "copytree", fake_copytree)
+        copy(str(self.src_dir), str(self.dst))
+
+        assert calls["symlinks"] is False
+
+
+class TestMoveSymlinks:
+    """Tests for move's preserve_symlinks flag."""
+
+    @pytest.fixture(autouse=True)
+    def setup_tree(self, tmp_path: Path) -> None:
+        self.root = tmp_path / "move_root"
+        self.root.mkdir()
+
+        self.external = self.root / "external"
+        self.external.mkdir()
+        (self.external / "outside.txt").write_text("outside")
+
+        self.src_dir = self.root / "src_dir"
+        (self.src_dir / "sub").mkdir(parents=True)
+        (self.src_dir / "real.txt").write_text("real")
+        (self.src_dir / "sub" / "nested.txt").write_text("nested")
+
+        self.link_file = self.src_dir / "link_file"
+        _make_link_or_skip(self.link_file, str(self.src_dir / "real.txt"))
+        self.link_dir = self.src_dir / "link_dir"
+        _make_link_or_skip(self.link_dir, str(self.src_dir / "sub"),
+                           target_is_directory=True)
+        self.link_rel = self.src_dir / "link_rel"
+        _make_link_or_skip(self.link_rel, "real.txt")
+
+        yield
+
+    def test_preserve_retargets_in_tree_links_after_move(self):
+        """Core feature: a same-drive move leaves in-tree absolute links
+        dangling; the flag rewrites them to the moved tree."""
+        dst_dir = self.root / "moved"
+
+        move(str(self.src_dir), str(dst_dir), retarget_symlinks=True)
+
+        moved_link = dst_dir / "link_file"
+        assert moved_link.is_symlink()
+        assert os.path.normpath(_readlink_clean(moved_link)) == \
+            os.path.normpath(str(dst_dir / "real.txt"))
+
+        moved_dlink = dst_dir / "link_dir"
+        assert moved_dlink.resolve() == (dst_dir / "sub").resolve()
+
+        # relative link still resolves inside the moved tree
+        assert (dst_dir / "link_rel").resolve() == \
+            (dst_dir / "real.txt").resolve()
+
+    def test_default_leaves_in_tree_links_dangling(self):
+        """Without the flag, the rename keeps the old absolute target,
+        which no longer exists."""
+        dst_dir = self.root / "moved"
+
+        move(str(self.src_dir), str(dst_dir))
+
+        assert (dst_dir / "link_file").is_symlink()
+        assert not (dst_dir / "link_file").exists()
+
+    def test_move_into_existing_dir_retargets_to_landing_root(self):
+        """Docstring (move, table): directory src + existing dir dst ->
+        tree lands at dst/<basename(src)> and the retarget pass uses
+        that landing root."""
+        dst_container = self.root / "dst_container"
+        dst_container.mkdir()
+
+        move(str(self.src_dir), str(dst_container), retarget_symlinks=True)
+
+        land_root = dst_container / "src_dir"
+        assert land_root.is_dir()
+        assert os.path.normpath(_readlink_clean(land_root / "link_file")) == \
+            os.path.normpath(str(land_root / "real.txt"))
+
+    def test_single_symlink_move_keeps_link(self):
+        """Docstring (move, table): a single symlink src is moved as a
+        link with its original target and never retargeted, with the
+        flag off or on."""
+        for flag in (False, True):
+            link = self.root / f"single_link_{flag}"
+            _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+            dst_link = self.root / f"single_link_moved_{flag}"
+
+            move(str(link), str(dst_link), retarget_symlinks=flag)
+
+            assert dst_link.is_symlink()
+            assert os.path.normpath(_readlink_clean(dst_link)) == \
+                os.path.normpath(str(self.src_dir / "real.txt"))
+
+    def test_symlink_to_existing_file_default_raises(self):
+        """Docstring (move, table/Raises): symlink src + existing file
+        dst + 'default' -> FileExistsError (os.rename cannot replace a
+        file with a link); the link is left in place."""
+        link = self.root / "link4"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        with pytest.raises(FileExistsError):
+            move(str(link), str(dst))
+
+        assert link.is_symlink()
+
+    def test_symlink_to_existing_file_overwrite(self):
+        """Docstring (move, table): symlink src + existing file dst +
+        'overwrite' -> existing file removed first, then link moved."""
+        link = self.root / "link4"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        move(str(link), str(dst), exist_policy='overwrite')
+
+        assert dst.is_symlink()
+        assert not link.exists()
+
+    def test_symlink_to_existing_file_rename(self):
+        """Docstring (move, table): symlink src + existing file dst +
+        'rename' -> link moved to stem_0.ext."""
+        link = self.root / "link4"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        move(str(link), str(dst), exist_policy='rename')
+
+        assert dst.read_text() == "block"
+        assert (self.root / "blocker_0.txt").is_symlink()
+
+    def test_symlink_to_existing_dir_lands_inside(self):
+        """Docstring (move, table): symlink src + existing dir dst ->
+        moved into it as dst/<basename(src)>, still a link."""
+        link = self.root / "link4"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        container = self.root / "container"
+        container.mkdir()
+
+        move(str(link), str(container))
+
+        assert (container / "link4").is_symlink()
+
+    def test_dry_run_previews_retargets(self, capsys):
+        """Docstring (move, Notes): dry_run prints
+        '[dry-run] [RETARGET] ...' for every link that would be
+        rewritten, and moves nothing."""
+        dst_dir = self.root / "moved"
+
+        move(str(self.src_dir), str(dst_dir), retarget_symlinks=True,
+             dry_run=True)
+
+        assert self.src_dir.exists()
+        assert not dst_dir.exists()
+        captured = capsys.readouterr()
+        assert "[dry-run] [RETARGET]" in captured.out
+
+
+class TestSymlinkPrivilegePrecheck:
+    """Privilege pre-check plumbing tests.
+
+    No real symlinks are created, so these run in any environment;
+    the walk helpers are monkeypatched to pretend links exist.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_tree(self, tmp_path: Path) -> None:
+        self.root = tmp_path / "plain_root"
+        self.src_dir = self.root / "src_dir"
+        (self.src_dir / "sub").mkdir(parents=True)
+        (self.src_dir / "real.txt").write_text("real")
+        self.dst = self.root / "dst"
+
+    @staticmethod
+    def _raise_perm():
+        raise PermissionError("no privilege")
+
+    def test_copy_precheck_raises_before_mutation(self, monkeypatch):
+        """Docstring (copy, Raises): preserve on + tree containing links
+        + missing symlink privilege -> PermissionError before anything
+        is copied (dst is not created)."""
+        monkeypatch.setattr(operator_module, "_iter_symlinks",
+                            lambda root: iter([os.path.join(root, "fake")]))
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
+                            self._raise_perm)
+
+        with pytest.raises(PermissionError, match="no privilege"):
+            copy(str(self.src_dir), str(self.dst), preserve_symlinks=True)
+
+        assert not self.dst.exists()  # nothing was written
+
+    def test_copy_precheck_skipped_without_links(self, monkeypatch):
+        """Docstring (copy, preserve_symlinks param): no links in the
+        tree -> the privilege probe is skipped and the copy succeeds
+        even without symlink rights."""
+        def spy():
+            raise AssertionError("privilege probe must not be called")
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege", spy)
+
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True)
+
+        # no links in the tree -> no probe -> copy succeeds anywhere
+        assert self.dst.is_dir()
+
+    def test_copy_precheck_dry_run_also_raises(self, monkeypatch):
+        """Docstring (copy, dry_run param): the privilege pre-check runs
+        in dry_run mode too, so previews double as feasibility checks."""
+        monkeypatch.setattr(operator_module, "_iter_symlinks",
+                            lambda root: iter([os.path.join(root, "fake")]))
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
+                            self._raise_perm)
+
+        with pytest.raises(PermissionError, match="no privilege"):
+            copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
+                 dry_run=True)
+
+        assert not self.dst.exists()
+
+    def test_move_precheck_raises_before_mutation(self, monkeypatch):
+        """Docstring (move, Raises): retarget on + at least one link
+        would be rewritten + missing privilege -> PermissionError before
+        anything is moved (src stays in place)."""
+        fake = [(str(self.root / "fake"), "old", "new")]
+        monkeypatch.setattr(operator_module, "_iter_retargets",
+                            lambda root, s, d: iter(fake))
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
+                            self._raise_perm)
+
+        with pytest.raises(PermissionError, match="no privilege"):
+            move(str(self.src_dir), str(self.dst), retarget_symlinks=True)
+
+        assert self.src_dir.exists()  # nothing was moved
+        assert not self.dst.exists()
+
+    def test_move_precheck_dry_run_also_raises(self, monkeypatch):
+        """Docstring (move, dry_run param): the privilege pre-check runs
+        in dry_run mode too (infeasible move fails in the preview)."""
+        fake = [(str(self.root / "fake"), "old", "new")]
+        monkeypatch.setattr(operator_module, "_iter_retargets",
+                            lambda root, s, d: iter(fake))
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
+                            self._raise_perm)
+
+        with pytest.raises(PermissionError, match="no privilege"):
+            move(str(self.src_dir), str(self.dst), retarget_symlinks=True,
+                 dry_run=True)
+
+        assert self.src_dir.exists()
+        assert not self.dst.exists()
+
+    def test_move_precheck_skipped_without_rewritable_links(self,
+                                                            monkeypatch):
+        """Docstring (move, retarget_symlinks param): retarget on but no
+        link target would actually change -> no probe, the plain rename
+        succeeds without symlink rights."""
+        def spy():
+            raise AssertionError("privilege probe must not be called")
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege", spy)
+
+        move(str(self.src_dir), str(self.dst), retarget_symlinks=True)
+
+        # no rewritable links -> no probe -> plain rename succeeds
+        assert not self.src_dir.exists()
+        assert self.dst.is_dir()
 
 
 class TestMergeFolders:
