@@ -29,6 +29,7 @@ pip install -e .
   - `remove`: delete file/folder with `recursive` control
   - `move`: move path with destination conflict policies
   - `copy`: copy file/folder with destination conflict policies
+  - `merge_folders`: one-way merge `src` into `dst` without overwriting (SHA-256 dedupe, auto-rename on conflict)
 - `filelib.resolver`
   - `is_same_path`: compare two paths after `Path.resolve()` normalization
 - `filelib.checker`
@@ -180,6 +181,20 @@ deploy_filelib(
 )
 ```
 
+### 7) Merge two folders without overwriting
+
+```python
+from filelib.operator import merge_folders
+
+# Preview first (no filesystem change)
+stats = merge_folders(src="backup/photos", dst="library/photos", dry_run=True)
+print(stats)  # {'copied': 12, 'skipped': 5, 'renamed': 3}
+
+# Execute with a per-file log
+stats = merge_folders(src="backup/photos", dst="library/photos", run_log=True)
+print(stats)
+```
+
 ## API Notes and Behaviors
 
 ### `scanner.ls`
@@ -213,6 +228,19 @@ deploy_filelib(
   - `overwrite`: remove existing destination file first
   - `rename`: auto-generate destination suffix (`_0`, `_1`, ...)
 - `make_dir=True` creates missing destination parent directories.
+
+### `operator.merge_folders`
+
+- Never overwrites: on name conflict the destination file is kept, and the source file is copied under an auto-renamed name.
+- Rename format is `stem_0.ext`, `stem_1.ext`, ... (same as `operator.move/copy` with `exist_policy="rename"`).
+- Files are matched by relative path:
+  - destination missing -> direct copy with parent directories created
+  - identical SHA-256 -> skipped
+  - different content or non-file destination (e.g. a directory) -> renamed copy
+- Empty directories in `src` are not created in `dst`; extra files in `dst` are left untouched.
+- `dry_run=True` still hashes conflicting files, so the returned statistics are accurate for the preview.
+- Returns `{"copied": n, "skipped": n, "renamed": n}`.
+- Raises `FileNotFoundError` if `src`/`dst` is missing; `ValueError` if a path is not a directory, or `src` and `dst` are the same folder, or `dst` is nested inside `src`.
 
 ### `identifier.is_file_corrupted`
 
@@ -264,3 +292,4 @@ pytest -q
 
 - `scanner.is_empty_dir` is currently a placeholder and not implemented.
 - `download_response` does not create parent directories automatically.
+- `merge_folders` follows directory symlinks while scanning; symlink cycles are not detected and can cause duplicated traversal or statistics.

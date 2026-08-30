@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`filelib` is a small personal-reuse Python (>= 3.9) library of file-handling utilities: directory scanning, move/copy/remove, path/file/folder comparison, HTTP downloads, image corruption checks, and deployment of AI-agent skills. Full API documentation with exact parameter semantics (`path_type`, `exist_policy`, `recursive` modes, skill name resolution) lives in README.md — extend it when changing behavior.
+`filelib` is a small personal-reuse Python (>= 3.9) library of file-handling utilities: directory scanning, move/copy/remove, path/file/folder comparison, HTTP downloads, image corruption checks, folder merging, and deployment of AI-agent skills. Full API documentation with exact parameter semantics (`path_type`, `exist_policy`, `recursive` modes, skill name resolution) lives in README.md — extend it when changing behavior. Agent-facing behavior docs (module capability map, critical constraints, procedures, recipes) live in `doc/agent/SKILL.md` (English) and `doc/agent/SKILL_zh.md` (Chinese) — consult those for how to use filelib as an agent.
 
 ## Commands
 
@@ -21,7 +21,7 @@ Windows/PowerShell environment. No specific conda environment is required; run p
 - `src` layout; runtime dependencies (`requests`, `puremagic`, `image_complete`) are declared in pyproject.toml.
 - One small, single-purpose module per concern under `src/filelib/`:
   - `scanner.py` — `ls()`, the package's canonical traversal API
-  - `operator.py` — `remove`/`move`/`copy` with `dry_run`/`run_log`/`exist_policy`/`make_dir`
+  - `operator.py` — `remove`/`move`/`copy`/`merge_folders` with `dry_run`/`run_log`/`exist_policy`/`make_dir`
   - `checker.py` — `is_same_file`/`is_same_folder`
   - `resolver.py` — `is_same_path`
   - `downloader.py` — `download_response`

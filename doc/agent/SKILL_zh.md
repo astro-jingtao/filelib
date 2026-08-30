@@ -28,6 +28,7 @@ user-invocable: true
   - `remove(...)`: 删除文件/目录，支持 `dry_run`、`run_log`、`recursive`。
   - `move(...)`: 移动文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`。
   - `copy(...)`: 复制文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`。
+  - `merge_folders(src, dst, dry_run=False, run_log=False)`: 将 `src` 单向合并进 `dst`；永不覆盖（SHA-256 相同跳过，冲突自动改名）；返回 `{'copied', 'skipped', 'renamed'}` 统计。
 - `filelib.downloader`
   - `download_response(...)`: HTTP 下载到本地文件，返回状态码。
 - `filelib.identifier`
@@ -57,6 +58,11 @@ user-invocable: true
   - 文件按相对路径配对；相对路径要完全匹配。
   - `match_func` 是可选过滤函数，只比较过滤后的文件。
   - 空目录或被完全过滤的目录视为相同。
+- `operator.merge_folders` 永不覆盖目标已有文件。
+  - 相对路径相同且 SHA-256 相同：跳过；内容不同或目标不是文件：以 `stem_0.ext` / `stem_1.ext` 改名复制。
+  - 源中空目录不会被创建；目标多出的文件不受影响。
+  - `dry_run=True` 仍会计算哈希，返回的统计是准确的。
+  - 抛出 `FileNotFoundError`（路径缺失）/ `ValueError`（非目录、同一文件夹或 `dst` 在 `src` 内）。
 
 ## Agent 工作流程
 1. 明确任务类型。
@@ -64,6 +70,7 @@ user-invocable: true
 - 文件/文件夹比较用 `checker.is_same_file` 或 `checker.is_same_folder`。
 - 路径比较优先用 `resolver.is_same_path`。
 - 文件变更优先用 `operator.*`。
+- 不覆盖式文件夹合并用 `operator.merge_folders`。
 - 下载任务用 `downloader.download_response`。
 - 图片健康检查用 `identifier.is_file_corrupted`。
 
@@ -155,6 +162,15 @@ status = download_response(
 )
 ```
 
+### 6) 合并目录且不覆盖
+```python
+from filelib.operator import merge_folders
+
+stats = merge_folders('incoming', 'archive', dry_run=True)   # 预演
+stats = merge_folders('incoming', 'archive', run_log=True)   # 执行
+print(stats)
+```
+
 ## 失败处理建议
 - 出现 `FileNotFoundError`:
   - 检查源路径是否存在。
@@ -165,6 +181,8 @@ status = download_response(
   - 使用 `file_only | raw_full_path | abs_full_path | rel_path`。
 - 出现不支持 MIME:
   - 改为 `unsupported_policy='return'` 并设置 `unsupported_return`，或先按扩展名过滤。
+- 出现 `ValueError: Source and destination must be different folders`:
+  - 选用互不嵌套的 `src`/`dst` 目录。
 
 ## 注意事项
 - 本 skill 基于当前仓库实现，不假设额外封装层。

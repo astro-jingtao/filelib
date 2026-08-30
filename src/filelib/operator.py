@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import os
 import shutil
 from pathlib import Path
+
+from filelib.checker import is_same_file
 from filelib.printer import Printer
+from filelib.resolver import is_same_path
+from filelib.scanner import ls
 
 
 def remove(path, recursive=False, dry_run=False, run_log=False):
@@ -111,6 +117,99 @@ def copy(src,
     printer.print_general_run_log(f"Copied {src} to {dst}")
 
 
+def merge_folders(src: str | Path,
+                  dst: str | Path,
+                  dry_run: bool = False,
+                  run_log: bool = False) -> dict[str, int]:
+    """
+    Merge all files from ``src`` into ``dst`` without ever overwriting.
+
+    For each source file, matched against ``dst`` by relative path:
+    * Destination does not exist: the file is copied (missing parent
+      directories are created automatically).
+    * Destination exists and both are files with identical content
+      (SHA-256): the file is skipped.
+    * Destination exists and both are files with different content: the
+      source file is copied under an auto-renamed name
+      (``stem_0.ext``, ``stem_1.ext``, ...).
+    * Destination exists but is not a file (e.g. a directory): the source
+      file is copied under an auto-renamed name.
+
+    Files that exist only in ``dst`` are left untouched, and empty
+    directories in ``src`` are not created in ``dst``. Hashes are computed
+    in ``dry_run`` mode as well, so the returned statistics are accurate
+    for a preview.
+
+    Parameters
+    ----------
+    src : str | Path
+        Source folder to merge from.
+    dst : str | Path
+        Target folder to merge into. Existing files are never overwritten.
+    dry_run : bool, default False
+        If True, only preview the actions without touching the filesystem.
+    run_log : bool, default False
+        If True, print a log line for every action. In dry_run mode,
+        preview lines are printed instead.
+
+    Returns
+    -------
+    dict of str to int
+        Statistics with keys ``copied``, ``skipped``, ``renamed``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``src`` or ``dst`` does not exist.
+    ValueError
+        If ``src`` or ``dst`` is not a directory, or if they are the same
+        folder, or if ``dst`` is nested inside ``src``.
+    """
+    MAX_TRY = 10000  # max tries to find a free rename suffix
+
+    printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
+
+    src_path = Path(src)
+    dst_path = Path(dst)
+    _validate(src_path, dst_path)
+
+    copied = skipped = renamed = 0
+
+    src_files = ls(directory=str(src_path), recursive=True, path_type='rel_path')
+
+    for rel_str in src_files:
+        rel = Path(rel_str).as_posix()  # normalize separators for printing
+        src_file = src_path / rel_str
+        dst_file = dst_path / rel_str
+
+        if not dst_file.exists():
+            printer.print_general_run_log(f"[COPY] {rel}")
+            if not dry_run:
+                copy(str(src_file), str(dst_file), make_dir=True)
+            copied += 1
+        elif not dst_file.is_file():
+            new_dst = Path(get_unique_new_dst(str(dst_file), MAX_TRY))
+            printer.print_general_run_log(
+                f"[RENAME] {rel} -> {new_dst.relative_to(dst_path).as_posix()} "
+                f"(destination is not a file)")
+            if not dry_run:
+                copy(str(src_file), str(new_dst), make_dir=True)
+            renamed += 1
+        elif is_same_file(src_file, dst_file):
+            printer.print_general_run_log(f"[SKIP] {rel} (same SHA-256)")
+            skipped += 1
+        else:
+            new_dst = Path(get_unique_new_dst(str(dst_file), MAX_TRY))
+            printer.print_general_run_log(
+                f"[RENAME] {rel} -> {new_dst.relative_to(dst_path).as_posix()} "
+                f"(different SHA-256)")
+            if not dry_run:
+                copy(str(src_file), str(new_dst), make_dir=True)
+            renamed += 1
+
+    return {"copied": copied, "skipped": skipped, "renamed": renamed}
+
+
 def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
     """ check if the parent folder of dst exist, if not, create it or raise error
 
@@ -170,6 +269,12 @@ def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer):
 
 
 def get_unique_new_dst(dst, MAX_TRY):
+    """Generate a non-existing path by appending a numeric suffix.
+
+    Candidates are ``stem_0.ext``, ``stem_1.ext``, ...; returns the first
+    one that does not exist (str with forward slashes). Raises RuntimeError
+    if no free name is found within ``MAX_TRY`` tries.
+    """
     dst_path = Path(dst)
     dst_new = dst_path.with_suffix('').as_posix() + '_0' + dst_path.suffix
     for i in range(1, MAX_TRY):
@@ -183,3 +288,20 @@ def get_unique_new_dst(dst, MAX_TRY):
         )
 
     return dst_new
+
+
+def _validate(src_path: Path, dst_path: Path) -> None:
+    """Validate merge inputs; raise FileNotFoundError / ValueError."""
+    if not src_path.exists():
+        raise FileNotFoundError(f"Source folder not found: {src_path}")
+    if not dst_path.exists():
+        raise FileNotFoundError(f"Destination folder not found: {dst_path}")
+    if not src_path.is_dir():
+        raise ValueError(f"Not a directory: {src_path}")
+    if not dst_path.is_dir():
+        raise ValueError(f"Not a directory: {dst_path}")
+    if is_same_path(src_path, dst_path):
+        raise ValueError("Source and destination must be different folders.")
+    if src_path.resolve() in dst_path.resolve().parents:
+        raise ValueError(
+            f"Destination folder must not be inside the source folder: {dst_path}")

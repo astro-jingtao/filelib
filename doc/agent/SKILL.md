@@ -28,6 +28,7 @@ user-invocable: true
   - `remove(...)`: remove files/directories with `dry_run`, `run_log`, and `recursive` controls.
   - `move(...)`: move files/directories with `exist_policy`, `make_dir`, and `dry_run` controls.
   - `copy(...)`: copy files/directories with `exist_policy`, `make_dir`, and `dry_run` controls.
+  - `merge_folders(src, dst, dry_run=False, run_log=False)`: one-way merge of `src` into `dst`; never overwrites (skip on same SHA-256, auto-rename on conflict); returns `{'copied', 'skipped', 'renamed'}` statistics.
 - `filelib.downloader`
   - `download_response(...)`: download HTTP response content to local file, returns status code.
 - `filelib.identifier`
@@ -57,6 +58,11 @@ user-invocable: true
   - Files are matched by relative path within their respective folders.
   - `match_func` filters files to compare; if all filtered files match, folders are considered identical.
   - Empty folders or folders with all files filtered out are considered identical.
+- `operator.merge_folders` never overwrites existing destination files.
+  - Same relative path + same SHA-256: skipped; different content or non-file destination: copied as `stem_0.ext` / `stem_1.ext`.
+  - Empty source directories are not created; extra destination files are untouched.
+  - `dry_run=True` still hashes, so returned statistics are exact.
+  - Raises `FileNotFoundError` (missing path) / `ValueError` (not a directory, same folder, or `dst` inside `src`).
 
 ## Agent Procedure
 1. Identify task category.
@@ -64,6 +70,7 @@ user-invocable: true
 - Use `checker.is_same_file` or `checker.is_same_folder` for file/folder comparison.
 - Use `resolver.is_same_path` for path identity checks.
 - Use `operator.*` for filesystem mutations.
+- Use `operator.merge_folders` for non-overwriting folder merges.
 - Use `downloader.download_response` for network-to-file tasks.
 - Use `identifier.is_file_corrupted` for image integrity checks.
 
@@ -155,6 +162,15 @@ status = download_response(
 )
 ```
 
+### 6) Merge folders without overwriting
+```python
+from filelib.operator import merge_folders
+
+stats = merge_folders('incoming', 'archive', dry_run=True)   # preview
+stats = merge_folders('incoming', 'archive', run_log=True)   # execute
+print(stats)
+```
+
 ## Failure Handling
 - `FileNotFoundError`:
   - Confirm source path exists.
@@ -165,6 +181,8 @@ status = download_response(
   - Use one of `file_only`, `raw_full_path`, `abs_full_path`, or `rel_path`.
 - Unsupported MIME errors:
   - Use `unsupported_policy='return'` with `unsupported_return`, or pre-filter by extension.
+- `ValueError: Source and destination must be different folders`:
+  - Pick separate `src`/`dst` that are not nested inside each other.
 
 ## Notes
 - This skill reflects the current repository implementation directly.

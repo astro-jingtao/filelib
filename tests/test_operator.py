@@ -1,8 +1,10 @@
 # pylint: disable=attribute-defined-outside-init
 
+from pathlib import Path
+
 import pytest
 import filelib.operator as operator_module
-from filelib.operator import copy, move, remove
+from filelib.operator import copy, merge_folders, move, remove
 
 
 class TestRemove:
@@ -575,3 +577,257 @@ class TestCopy:
         assert calls["src"] == str(self.src_folder)
         assert calls["dst"] == str(dst_folder)
         assert calls["copy_function"] is fake_copy_function
+
+
+class TestMergeFolders:
+    """Tests for merge_folders function."""
+
+    @pytest.fixture(autouse=True)
+    def setup_tree(self, tmp_path: Path) -> None:
+        """Build the standard source/target tree.
+
+        Expected merge result: 2 copied, 1 skipped, 2 renamed.
+        """
+        self.src = tmp_path / "src"
+        self.dst = tmp_path / "dst"
+        self.src.mkdir()
+        self.dst.mkdir()
+
+        # new_file.txt: only in src -> copied
+        (self.src / "new_file.txt").write_text("brand new")
+        # same.txt: identical on both sides -> skipped
+        (self.src / "same.txt").write_text("same content")
+        (self.dst / "same.txt").write_text("same content")
+        # diff.txt: different content -> renamed
+        (self.src / "diff.txt").write_text("source version")
+        (self.dst / "diff.txt").write_text("target version")
+        # as_dir.txt: dst side is a directory -> renamed
+        (self.src / "as_dir.txt").write_text("source as dir")
+        (self.dst / "as_dir.txt").mkdir()
+        # nested/deep.txt: parent directory must be created in dst
+        (self.src / "nested").mkdir()
+        (self.src / "nested" / "deep.txt").write_text("deep")
+        # empty_dir: must not be created in dst
+        (self.src / "empty_dir").mkdir()
+        # extra.txt: only in dst -> untouched
+        (self.dst / "extra.txt").write_text("target only")
+
+    def test_copy_new_file(self):
+        """A file missing in dst is copied."""
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "new_file.txt").read_text() == "brand new"
+
+    def test_copy_creates_parent_directories(self):
+        """Missing parent directories in dst are created automatically."""
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "nested" / "deep.txt").read_text() == "deep"
+
+    def test_skip_identical_file(self):
+        """A file with identical SHA-256 on both sides is skipped."""
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "same.txt").read_text() == "same content"
+        assert not (self.dst / "same_0.txt").exists()
+
+    def test_rename_different_content(self):
+        """A conflicting file is kept in dst; the source is copied under a new name."""
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "diff.txt").read_text() == "target version"
+        assert (self.dst / "diff_0.txt").read_text() == "source version"
+
+    def test_rename_when_destination_is_directory(self):
+        """A source file is renamed when the same dst path is a directory."""
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "as_dir.txt").is_dir()
+        assert (self.dst / "as_dir_0.txt").read_text() == "source as dir"
+
+    def test_rename_skips_occupied_suffix(self):
+        """Occupied rename suffixes are skipped until a free one is found."""
+        (self.dst / "diff_0.txt").write_text("occupied")
+        (self.dst / "diff_1.txt").write_text("occupied")
+
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "diff_0.txt").read_text() == "occupied"
+        assert (self.dst / "diff_1.txt").read_text() == "occupied"
+        assert (self.dst / "diff_2.txt").read_text() == "source version"
+
+    def test_nested_conflict_renamed_in_subdir(self, tmp_path):
+        """Conflicts inside subdirectories are renamed in place."""
+        src = tmp_path / "src2"
+        dst = tmp_path / "dst2"
+        (src / "nested").mkdir(parents=True)
+        (dst / "nested").mkdir(parents=True)
+        (src / "nested" / "x.txt").write_text("source")
+        (dst / "nested" / "x.txt").write_text("target")
+
+        merge_folders(src, dst)
+
+        assert (dst / "nested" / "x.txt").read_text() == "target"
+        assert (dst / "nested" / "x_0.txt").read_text() == "source"
+
+    def test_empty_source_dir_not_created(self):
+        """Empty directories in src are not created in dst."""
+        merge_folders(self.src, self.dst)
+
+        assert not (self.dst / "empty_dir").exists()
+
+    def test_extra_dst_files_untouched(self):
+        """Files that exist only in dst are left untouched."""
+        merge_folders(self.src, self.dst)
+
+        assert (self.dst / "extra.txt").read_text() == "target only"
+
+    def test_returns_statistics_dict(self):
+        """The returned statistics match the expected merge outcome."""
+        result = merge_folders(self.src, self.dst)
+
+        assert result == {"copied": 2, "skipped": 1, "renamed": 2}
+
+    def test_dry_run_makes_no_changes(self):
+        """dry_run=True previews without touching the filesystem."""
+        merge_folders(self.src, self.dst, dry_run=True)
+
+        assert not (self.dst / "new_file.txt").exists()
+        assert not (self.dst / "diff_0.txt").exists()
+        assert not (self.dst / "as_dir_0.txt").exists()
+        assert not (self.dst / "nested").exists()
+
+    def test_dry_run_prints_preview(self, capsys):
+        """dry_run=True prints preview lines for every action."""
+        merge_folders(self.src, self.dst, dry_run=True)
+
+        captured = capsys.readouterr()
+        assert "[dry-run] [COPY] new_file.txt" in captured.out
+        assert "[dry-run] [COPY] nested/deep.txt" in captured.out
+        assert "[dry-run] [SKIP] same.txt (same SHA-256)" in captured.out
+        assert ("[dry-run] [RENAME] diff.txt -> diff_0.txt "
+                "(different SHA-256)") in captured.out
+        assert ("[dry-run] [RENAME] as_dir.txt -> as_dir_0.txt "
+                "(destination is not a file)") in captured.out
+
+    def test_dry_run_still_hashes_identical_files(self):
+        """dry_run still hashes, so skipped statistics are accurate."""
+        result = merge_folders(self.src, self.dst, dry_run=True)
+
+        assert result["skipped"] == 1
+
+    def test_run_log_prints_actions(self, capsys):
+        """run_log=True prints a log line for every action."""
+        merge_folders(self.src, self.dst, run_log=True)
+
+        captured = capsys.readouterr()
+        assert "[COPY] new_file.txt" in captured.out
+        assert "[SKIP] same.txt (same SHA-256)" in captured.out
+        assert "[RENAME] diff.txt -> diff_0.txt (different SHA-256)" in captured.out
+        assert "[dry-run]" not in captured.out
+
+    def test_default_quiet(self, capsys):
+        """Default invocation prints nothing."""
+        merge_folders(self.src, self.dst)
+
+        assert capsys.readouterr().out == ""
+
+    def test_run_log_and_dry_run_prints_dry_run_only(self, capsys):
+        """With both flags set, only dry-run preview lines are printed."""
+        merge_folders(self.src, self.dst, dry_run=True, run_log=True)
+
+        captured = capsys.readouterr()
+        assert "[dry-run]" in captured.out
+        assert "\n[COPY]" not in captured.out
+
+    def test_src_not_found_raises(self):
+        """Missing src raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="not found"):
+            merge_folders(self.src / "missing", self.dst)
+
+    def test_dst_not_found_raises(self):
+        """Missing dst raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="not found"):
+            merge_folders(self.src, self.dst / "missing")
+
+    def test_src_not_a_directory_raises(self, tmp_path):
+        """A non-directory src raises ValueError."""
+        file_path = tmp_path / "file.txt"
+        file_path.write_text("content")
+
+        with pytest.raises(ValueError, match="Not a directory"):
+            merge_folders(file_path, self.dst)
+
+    def test_dst_not_a_directory_raises(self, tmp_path):
+        """A non-directory dst raises ValueError."""
+        file_path = tmp_path / "file.txt"
+        file_path.write_text("content")
+
+        with pytest.raises(ValueError, match="Not a directory"):
+            merge_folders(self.src, file_path)
+
+    def test_same_src_and_dst_raises(self):
+        """Merging a folder into itself raises ValueError."""
+        with pytest.raises(ValueError, match="must be different"):
+            merge_folders(self.src, self.src)
+
+    def test_dst_inside_src_raises(self):
+        """A dst nested inside src raises ValueError."""
+        nested_dst = self.src / "dst"
+        nested_dst.mkdir()
+
+        with pytest.raises(ValueError, match="inside the source"):
+            merge_folders(self.src, nested_dst)
+
+    def test_string_paths_accepted(self):
+        """String paths are accepted."""
+        result = merge_folders(str(self.src), str(self.dst))
+
+        assert result == {"copied": 2, "skipped": 1, "renamed": 2}
+
+    def test_copy_called_with_make_dir(self, monkeypatch):
+        """operator.copy is called with make_dir=True and string paths."""
+        calls = []
+
+        def fake_copy(src, dst, **kwargs):
+            calls.append((src, dst, kwargs))
+
+        monkeypatch.setattr(operator_module, "copy", fake_copy)
+
+        merge_folders(self.src, self.dst)
+
+        assert len(calls) == 4
+        for src_arg, dst_arg, kwargs in calls:
+            assert isinstance(src_arg, str)
+            assert isinstance(dst_arg, str)
+            assert kwargs == {"make_dir": True}
+
+    def test_empty_src_folder_returns_zeros(self, tmp_path):
+        """An empty src merges without error and returns zero statistics."""
+        src = tmp_path / "src_empty"
+        dst = tmp_path / "dst_empty"
+        src.mkdir()
+        dst.mkdir()
+
+        result = merge_folders(src, dst)
+
+        assert result == {"copied": 0, "skipped": 0, "renamed": 0}
+
+    def test_end_to_end_preview_then_merge(self, capsys):
+        """Full flow: dry-run preview, then execute, then verify the final state."""
+        # preview: nothing written, accurate statistics
+        stats = merge_folders(self.src, self.dst, dry_run=True)
+        assert stats == {"copied": 2, "skipped": 1, "renamed": 2}
+        assert not (self.dst / "new_file.txt").exists()
+        assert "[dry-run]" in capsys.readouterr().out
+
+        # execute and verify the final state
+        stats = merge_folders(self.src, self.dst, run_log=True)
+        assert stats == {"copied": 2, "skipped": 1, "renamed": 2}
+        assert (self.dst / "new_file.txt").read_text() == "brand new"
+        assert (self.dst / "nested" / "deep.txt").read_text() == "deep"
+        assert (self.dst / "diff.txt").read_text() == "target version"  # untouched
+        assert (self.dst / "diff_0.txt").read_text() == "source version"
+        assert (self.dst / "as_dir.txt").is_dir()
+        assert (self.dst / "as_dir_0.txt").read_text() == "source as dir"
+        assert (self.dst / "extra.txt").read_text() == "target only"
