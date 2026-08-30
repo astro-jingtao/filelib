@@ -72,7 +72,9 @@ def move(src,
          exist_policy='default',
          make_dir=False,
          run_log=False,
-         retarget_symlinks=False):
+         retarget_symlinks=False,
+         rename_format='{stem}_{i}{suffix}',
+         rename_start=0):
     """Move a file or directory from ``src`` to ``dst``.
 
     Wraps ``shutil.move``: same-drive moves rename, cross-drive moves
@@ -97,6 +99,18 @@ def move(src,
         Applied only when ``dst`` exists as a *file*. When ``dst`` is
         missing or an existing *directory*, ``exist_policy`` is
         ignored (see the table below for what happens instead).
+    rename_format : str, default '{stem}_{i}{suffix}'
+        Template for the auto-renamed destination used when
+        ``exist_policy='rename'``; applied to the *file name* of
+        ``dst`` (candidates stay in the directory of ``dst``).
+        Placeholders: ``{stem}`` (file name without its final suffix),
+        ``{suffix}`` (final suffix with its leading dot, empty for
+        names like ``README``) and ``{i}`` (candidate index; format
+        specs such as ``{i:03d}`` are supported; literal braces as
+        ``{{`` / ``}}``).
+    rename_start : int, default 0
+        First candidate index for ``exist_policy='rename'``; use 1 for
+        Windows-style ``name_1.ext`` numbering.
     make_dir : bool, default False
         If True, create missing parent directories of ``dst``; if
         False, raise ``FileNotFoundError`` when they are missing.
@@ -123,7 +137,10 @@ def move(src,
     ------
     ValueError
         If ``exist_policy`` is not one of ``'default'``, ``'overwrite'``,
-        ``'rename'``.
+        ``'rename'``, or if ``rename_format`` / ``rename_start`` are
+        invalid — the latter is checked only when a rename is actually
+        attempted (``exist_policy='rename'`` and ``dst`` exists as a
+        file), also in ``dry_run`` mode.
     FileNotFoundError
         If the parent folder of ``dst`` does not exist and
         ``make_dir`` is False.
@@ -181,11 +198,18 @@ def move(src,
     * Links are preserved by the move itself regardless of
       ``retarget_symlinks``; the flag only decides whether absolute
       in-tree targets are fixed up afterwards.
+    * With ``exist_policy='rename'`` the new name follows
+      ``rename_format`` (default ``{stem}_{i}{suffix}``, i.e.
+      ``stem_0.ext``) starting at index ``rename_start``; the stem and
+      suffix come from the replaced destination path (so a directory
+      tree lands at the renamed path, e.g. ``blocker_0.txt/``).
     """
 
     printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
 
-    dst = _check_dst_exist(dst, exist_policy, dry_run, printer)
+    dst = _check_dst_exist(dst, exist_policy, dry_run, printer,
+                           rename_format=rename_format,
+                           rename_start=rename_start)
 
     _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer)
 
@@ -227,7 +251,9 @@ def copy(src,
          make_dir=False,
          run_log=False,
          preserve_symlinks=False,
-         retarget_symlinks=False):
+         retarget_symlinks=False,
+         rename_format='{stem}_{i}{suffix}',
+         rename_start=0):
     """Copy a file or directory from ``src`` to ``dst``.
 
     Files are copied with ``shutil.copy2`` (metadata included) and
@@ -255,6 +281,18 @@ def copy(src,
         Applied only when ``dst`` exists as a *file*. When ``dst`` is
         missing or an existing *directory*, ``exist_policy`` is
         ignored (see the table below for what happens instead).
+    rename_format : str, default '{stem}_{i}{suffix}'
+        Template for the auto-renamed destination used when
+        ``exist_policy='rename'``; applied to the *file name* of
+        ``dst`` (candidates stay in the directory of ``dst``).
+        Placeholders: ``{stem}`` (file name without its final suffix),
+        ``{suffix}`` (final suffix with its leading dot, empty for
+        names like ``README``) and ``{i}`` (candidate index; format
+        specs such as ``{i:03d}`` are supported; literal braces as
+        ``{{`` / ``}}``).
+    rename_start : int, default 0
+        First candidate index for ``exist_policy='rename'``; use 1 for
+        Windows-style ``name_1.ext`` numbering.
     make_dir : bool, default False
         If True, create missing parent directories of ``dst``; if
         False, raise ``FileNotFoundError`` when they are missing.
@@ -282,7 +320,10 @@ def copy(src,
     ------
     ValueError
         If ``exist_policy`` is not one of ``'default'``, ``'overwrite'``,
-        ``'rename'``.
+        ``'rename'``, or if ``rename_format`` / ``rename_start`` are
+        invalid — the latter is checked only when a rename is actually
+        attempted (``exist_policy='rename'`` and ``dst`` exists as a
+        file), also in ``dry_run`` mode.
     FileNotFoundError
         If the parent folder of ``dst`` does not exist and
         ``make_dir`` is False.
@@ -361,12 +402,19 @@ def copy(src,
       containing both the link and its target is transported.
     * ``dry_run=True`` prints ``[dry-run] [RETARGET] <link>: <old> ->
       <new>`` for every link that would be rewritten.
+    * With ``exist_policy='rename'`` the new name follows
+      ``rename_format`` (default ``{stem}_{i}{suffix}``, i.e.
+      ``stem_0.ext``) starting at index ``rename_start``; the stem and
+      suffix come from the replaced destination path (so a directory
+      tree lands at the renamed path, e.g. ``blocker_0.txt/``).
     """
     # TODO: if -r
 
     printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
 
-    dst = _check_dst_exist(dst, exist_policy, dry_run, printer)
+    dst = _check_dst_exist(dst, exist_policy, dry_run, printer,
+                           rename_format=rename_format,
+                           rename_start=rename_start)
 
     _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer)
 
@@ -423,7 +471,9 @@ def copy(src,
 def merge_folders(src: str | Path,
                   dst: str | Path,
                   dry_run: bool = False,
-                  run_log: bool = False) -> dict[str, int]:
+                  run_log: bool = False,
+                  rename_format: str = '{stem}_{i}{suffix}',
+                  rename_start: int = 0) -> dict[str, int]:
     """
     Merge all files from ``src`` into ``dst`` without ever overwriting.
 
@@ -434,7 +484,8 @@ def merge_folders(src: str | Path,
       (SHA-256): the file is skipped.
     * Destination exists and both are files with different content: the
       source file is copied under an auto-renamed name
-      (``stem_0.ext``, ``stem_1.ext``, ...).
+      (``stem_0.ext``, ``stem_1.ext``, ... by default; see
+      ``rename_format``).
     * Destination exists but is not a file (e.g. a directory): the source
       file is copied under an auto-renamed name.
 
@@ -454,6 +505,13 @@ def merge_folders(src: str | Path,
     run_log : bool, default False
         If True, print a log line for every action. In dry_run mode,
         preview lines are printed instead.
+    rename_format : str, default '{stem}_{i}{suffix}'
+        Template for auto-renamed copies, applied to the destination
+        *file name* (see ``get_unique_new_dst``); format specs such as
+        ``{i:03d}`` are supported.
+    rename_start : int, default 0
+        First candidate index; use 1 for Windows-style
+        ``name_1.ext`` numbering.
 
     Returns
     -------
@@ -466,7 +524,9 @@ def merge_folders(src: str | Path,
         If ``src`` or ``dst`` does not exist.
     ValueError
         If ``src`` or ``dst`` is not a directory, or if they are the same
-        folder, or if ``dst`` is nested inside ``src``.
+        folder, or if ``dst`` is nested inside ``src``, or if
+        ``rename_format`` / ``rename_start`` are invalid (checked before
+        any file is copied).
     """
     MAX_TRY = 10000  # max tries to find a free rename suffix
 
@@ -475,6 +535,7 @@ def merge_folders(src: str | Path,
     src_path = Path(src)
     dst_path = Path(dst)
     _validate(src_path, dst_path)
+    _validate_rename_spec(rename_format, rename_start)
 
     copied = skipped = renamed = 0
 
@@ -491,7 +552,9 @@ def merge_folders(src: str | Path,
                 copy(str(src_file), str(dst_file), make_dir=True)
             copied += 1
         elif not dst_file.is_file():
-            new_dst = Path(get_unique_new_dst(str(dst_file), MAX_TRY))
+            new_dst = Path(get_unique_new_dst(str(dst_file), MAX_TRY,
+                                              rename_format=rename_format,
+                                              rename_start=rename_start))
             printer.print_general_run_log(
                 f"[RENAME] {rel} -> {new_dst.relative_to(dst_path).as_posix()} "
                 f"(destination is not a file)")
@@ -502,7 +565,9 @@ def merge_folders(src: str | Path,
             printer.print_general_run_log(f"[SKIP] {rel} (same SHA-256)")
             skipped += 1
         else:
-            new_dst = Path(get_unique_new_dst(str(dst_file), MAX_TRY))
+            new_dst = Path(get_unique_new_dst(str(dst_file), MAX_TRY,
+                                              rename_format=rename_format,
+                                              rename_start=rename_start))
             printer.print_general_run_log(
                 f"[RENAME] {rel} -> {new_dst.relative_to(dst_path).as_posix()} "
                 f"(different SHA-256)")
@@ -536,7 +601,8 @@ def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
             )
 
 
-def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer):
+def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer,
+                     rename_format='{stem}_{i}{suffix}', rename_start=0):
     """ check if dst already exist and deal with it according to `exist_policy`
 
     Parameters
@@ -549,6 +615,11 @@ def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer):
         if True, only print the operation without actually doing it
     printer : Printer
         printer object for logging
+    rename_format : str, default '{stem}_{i}{suffix}'
+        Template for the auto-renamed destination used when
+        ``exist_policy='rename'`` (see ``get_unique_new_dst``).
+    rename_start : int, default 0
+        First candidate index for ``exist_policy='rename'``.
     """
 
     MAX_TRY = 10000
@@ -564,33 +635,103 @@ def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer):
         printer.print_general_run_log(f"Removed existing file: {dst}")
         return dst
     elif exist_policy == 'rename':
-        dst_new = get_unique_new_dst(dst, MAX_TRY)
+        dst_new = get_unique_new_dst(dst, MAX_TRY,
+                                     rename_format=rename_format,
+                                     rename_start=rename_start)
         return dst_new
     else:
         raise ValueError(
             "exist_policy must be 'default', 'overwrite' or 'rename'")
 
 
-def get_unique_new_dst(dst, MAX_TRY):
-    """Generate a non-existing path by appending a numeric suffix.
+def get_unique_new_dst(dst, MAX_TRY,
+                       rename_format='{stem}_{i}{suffix}', rename_start=0):
+    """Generate a non-existing path from a rename template.
 
-    Candidates are ``stem_0.ext``, ``stem_1.ext``, ...; returns the first
-    one that does not exist (str with forward slashes). Raises RuntimeError
-    if no free name is found within ``MAX_TRY`` tries.
+    Candidates are rendered from ``rename_format`` with the candidate
+    index ``i`` running from ``rename_start``; returns the first one
+    that does not exist (str with forward slashes).
+
+    Parameters
+    ----------
+    dst : str | Path
+        Occupied destination path the candidates are derived from.
+    MAX_TRY : int
+        Maximum number of candidates to try.
+    rename_format : str, default '{stem}_{i}{suffix}'
+        Template applied to the *file name* of ``dst``; candidates
+        always stay in the directory of ``dst``. Placeholders:
+        ``{stem}`` (file name without its final suffix, e.g. ``diff``
+        for ``dst/nested/diff.txt``), ``{suffix}`` (final suffix with
+        its leading dot, empty for names like ``README``) and ``{i}``
+        (candidate index; format specs such as ``{i:03d}`` are
+        supported; literal braces as ``{{`` / ``}}``).
+    rename_start : int, default 0
+        First candidate index.
+
+    Returns
+    -------
+    str
+        The first candidate that does not exist, forward slashes.
+
+    Raises
+    ------
+    ValueError
+        If ``rename_format`` / ``rename_start`` are invalid (see
+        ``_validate_rename_spec``).
+    RuntimeError
+        If no free name is found within ``MAX_TRY`` tries.
     """
-    dst_path = Path(dst)
-    dst_new = dst_path.with_suffix('').as_posix() + '_0' + dst_path.suffix
-    for i in range(1, MAX_TRY):
-        if not os.path.exists(dst_new):
-            break
-        dst_new = dst_path.with_suffix(
-            '').as_posix() + f'_{i}' + dst_path.suffix
-    else:
-        raise RuntimeError(
-            f'{dst} already exists, and new name can not be found with {MAX_TRY} try'
-        )
+    _validate_rename_spec(rename_format, rename_start)
 
-    return dst_new
+    dst_path = Path(dst)
+    parent = dst_path.parent
+    stem = dst_path.with_suffix('').name  # file name minus final suffix
+    suffix = dst_path.suffix  # '.txt' or ''
+
+    for i in range(rename_start, rename_start + MAX_TRY):
+        candidate = (parent /
+                     rename_format.format(stem=stem, suffix=suffix,
+                                          i=i)).as_posix()
+        if not os.path.exists(candidate):
+            return candidate
+
+    raise RuntimeError(
+        f'{dst} already exists, and new name can not be found with {MAX_TRY} try'
+    )
+
+
+def _validate_rename_spec(rename_format, rename_start):
+    """Validate ``rename_format`` / ``rename_start``; raise ValueError.
+
+    Renders the template twice with consecutive indices instead of
+    parsing it: unknown or positional placeholders, malformed templates
+    and bad format specs surface as format-time errors, and a constant
+    template (no placeholder varying with the index) is caught by the
+    equality check.
+    """
+    if not isinstance(rename_format, str):
+        raise ValueError(
+            f'rename_format must be a str, got {type(rename_format).__name__}')
+    if isinstance(rename_start, bool) or not isinstance(rename_start, int):
+        raise ValueError(f'rename_start must be an int, got {rename_start!r}')
+    if rename_start < 0:
+        raise ValueError(
+            f'rename_start must be a non-negative int, got {rename_start}')
+
+    try:
+        first = rename_format.format(stem='stem', suffix='.ext',
+                                     i=rename_start)
+        second = rename_format.format(stem='stem', suffix='.ext',
+                                      i=rename_start + 1)
+    except (KeyError, IndexError, ValueError) as exc:
+        raise ValueError(
+            f'Invalid rename_format {rename_format!r}: only the placeholders '
+            f'{{stem}}, {{suffix}} and {{i}} are supported ({exc})') from exc
+    if first == second:
+        raise ValueError(
+            f'Invalid rename_format {rename_format!r}: it must contain a '
+            f"placeholder that varies with the candidate index, e.g. '{{i}}'")
 
 
 def _validate(src_path: Path, dst_path: Path) -> None:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import filelib.operator as operator_module
-from filelib.operator import copy, merge_folders, move, remove
+from filelib.operator import copy, get_unique_new_dst, merge_folders, move, remove
 
 
 class TestRemove:
@@ -349,6 +349,31 @@ class TestMove:
         assert "exist_policy must be" in str(excinfo.value)
         assert self.src_file.exists()
 
+    def test_move_exist_policy_rename_custom_format(self):
+        """exist_policy='rename' + 自定义 rename_format：按模板生成新名"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        move(str(self.src_file), str(dst_file), exist_policy='rename',
+             rename_format='{i:02d}_{stem}{suffix}')
+
+        renamed = self.dst_dir / "00_target.txt"
+        assert not self.src_file.exists()
+        assert dst_file.read_text() == "old content"
+        assert renamed.read_text() == "source content"
+
+    def test_move_rename_invalid_format_raises_in_dry_run(self):
+        """dry_run + 非法 rename_format：预览阶段即抛 ValueError"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            move(str(self.src_file), str(dst_file), dry_run=True,
+                 exist_policy='rename', rename_format='{oops}')
+
+        assert self.src_file.exists()
+        assert dst_file.read_text() == "old content"
+
     def test_move_dry_run_no_fs_change(self, capsys):
         """dry_run=True：不执行真实移动，但输出 dry-run 日志"""
         dst_file = self.dst_dir / "dry_moved.txt"
@@ -539,6 +564,32 @@ class TestCopy:
 
         assert "exist_policy must be" in str(excinfo.value)
         assert self.src_file.exists()
+
+    def test_copy_exist_policy_rename_custom_format_and_start(self):
+        """exist_policy='rename' + 自定义格式/起始序号：Windows 风格命名"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        copy(str(self.src_file), str(dst_file), exist_policy='rename',
+             rename_format='{stem} ({i}){suffix}', rename_start=1)
+
+        renamed = self.dst_dir / "target (1).txt"
+        assert self.src_file.exists()
+        assert dst_file.read_text() == "old content"
+        assert renamed.read_text() == "source content"
+
+    def test_copy_rename_invalid_format_raises(self):
+        """非法 rename_format：实际触发改名时抛 ValueError，不拷贝任何文件"""
+        dst_file = self.dst_dir / "target.txt"
+        dst_file.write_text("old content")
+
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            copy(str(self.src_file), str(dst_file), exist_policy='rename',
+                 rename_format='{oops}')
+
+        assert self.src_file.exists()
+        assert dst_file.read_text() == "old content"
+        assert not (self.dst_dir / "target_0.txt").exists()
 
     def test_copy_file_to_existing_file_default_overwrites(self):
         """Docstring (copy, table): file src + existing file dst +
@@ -1409,6 +1460,36 @@ class TestMergeFolders:
         assert (dst / "nested" / "x.txt").read_text() == "target"
         assert (dst / "nested" / "x_0.txt").read_text() == "source"
 
+    def test_rename_format_custom(self):
+        """Conflicting files are renamed according to a custom format."""
+        merge_folders(self.src, self.dst,
+                      rename_format='{stem} ({i}){suffix}')
+
+        assert (self.dst / "diff (0).txt").read_text() == "source version"
+        assert (self.dst / "as_dir (0).txt").read_text() == "source as dir"
+
+    def test_rename_start_one(self):
+        """Candidate numbering starts at rename_start."""
+        merge_folders(self.src, self.dst, rename_start=1)
+
+        assert (self.dst / "diff_1.txt").read_text() == "source version"
+        assert (self.dst / "as_dir_1.txt").read_text() == "source as dir"
+
+    def test_dry_run_preview_shows_custom_rename_name(self, capsys):
+        """Dry-run preview lines show the custom rename name."""
+        merge_folders(self.src, self.dst, dry_run=True,
+                      rename_format='{stem} ({i}){suffix}')
+
+        out = capsys.readouterr().out
+        assert "[dry-run] [RENAME] diff.txt -> diff (0).txt" in out
+
+    def test_invalid_rename_format_raises_before_any_copy(self):
+        """An invalid format raises before any file is copied."""
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            merge_folders(self.src, self.dst, rename_format='{stem}')
+
+        assert not (self.dst / "new_file.txt").exists()
+
     def test_empty_source_dir_not_created(self):
         """Empty directories in src are not created in dst."""
         merge_folders(self.src, self.dst)
@@ -1570,3 +1651,117 @@ class TestMergeFolders:
         assert (self.dst / "as_dir.txt").is_dir()
         assert (self.dst / "as_dir_0.txt").read_text() == "source as dir"
         assert (self.dst / "extra.txt").read_text() == "target only"
+
+
+class TestGetUniqueNewDst:
+    """Tests for the get_unique_new_dst rename-template function."""
+
+    @pytest.fixture(autouse=True)
+    def setup_dir(self, tmp_path: Path) -> None:
+        """Create a scratch directory for candidate names."""
+        self.dir = tmp_path / "ren"
+        self.dir.mkdir()
+
+    def test_default_format_returns_first_free(self):
+        """Default template yields stem_0.ext with forward slashes."""
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100)
+
+        assert result == (self.dir / "diff_0.txt").as_posix()
+
+    def test_default_format_skips_occupied_candidates(self):
+        """Occupied candidates are skipped until a free one is found."""
+        (self.dir / "diff_0.txt").write_text("occupied")
+        (self.dir / "diff_1.txt").write_text("occupied")
+
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100)
+
+        assert result == (self.dir / "diff_2.txt").as_posix()
+
+    def test_custom_format_parentheses(self):
+        """A custom template controls the candidate layout."""
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                                    rename_format='{stem} ({i}){suffix}')
+
+        assert result == (self.dir / "diff (0).txt").as_posix()
+
+    def test_rename_start_one(self):
+        """Numbering starts at rename_start."""
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                                    rename_start=1)
+
+        assert result == (self.dir / "diff_1.txt").as_posix()
+
+    def test_rename_start_with_occupied_candidates(self):
+        """Occupied candidates above rename_start are skipped."""
+        (self.dir / "diff_1.txt").write_text("occupied")
+
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                                    rename_start=1)
+
+        assert result == (self.dir / "diff_2.txt").as_posix()
+
+    def test_index_format_spec_zero_padding(self):
+        """Format specs on {i} such as zero padding are supported."""
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                                    rename_format='{stem}_{i:03d}{suffix}')
+
+        assert result == (self.dir / "diff_000.txt").as_posix()
+
+    def test_file_without_suffix(self):
+        """A name without suffix gets no stray dot."""
+        result = get_unique_new_dst(str(self.dir / "README"), 100)
+
+        assert result == (self.dir / "README_0").as_posix()
+
+    def test_multi_dot_name_moves_only_last_suffix(self):
+        """Only the final suffix is treated as {suffix}."""
+        result = get_unique_new_dst(str(self.dir / "a.tar.gz"), 100)
+
+        assert result == (self.dir / "a.tar_0.gz").as_posix()
+
+    def test_full_path_keeps_directories(self):
+        """{stem} keeps the directory part of the passed path."""
+        nested = self.dir / "nested"
+        nested.mkdir()
+
+        result = get_unique_new_dst(str(nested / "diff.txt"), 100)
+
+        assert result == (nested / "diff_0.txt").as_posix()
+
+    def test_template_without_index_placeholder_raises(self):
+        """A constant template raises ValueError instead of looping."""
+        with pytest.raises(ValueError, match="varies with the candidate index"):
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                               rename_format='{stem}{suffix}')
+
+    def test_unknown_placeholder_raises(self):
+        """Unknown placeholders raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                               rename_format='{stem}_{foo}{suffix}')
+
+    def test_malformed_template_raises(self):
+        """A malformed template raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                               rename_format='{stem')
+
+    def test_negative_rename_start_raises(self):
+        """A negative rename_start raises ValueError."""
+        with pytest.raises(ValueError, match="rename_start"):
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                               rename_start=-1)
+
+    def test_non_int_rename_start_raises(self):
+        """A non-int rename_start raises ValueError."""
+        with pytest.raises(ValueError, match="rename_start"):
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
+                               rename_start='1')
+
+    def test_exhaustion_raises_runtime_error(self):
+        """RuntimeError is raised when every candidate is occupied."""
+        for i in range(5):
+            (self.dir / f"diff_{i}.txt").write_text("occupied")
+
+        with pytest.raises(RuntimeError, match="can not be found"):
+            get_unique_new_dst(str(self.dir / "diff.txt"), 5)

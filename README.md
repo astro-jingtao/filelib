@@ -193,6 +193,10 @@ print(stats)  # {'copied': 12, 'skipped': 5, 'renamed': 3}
 # Execute with a per-file log
 stats = merge_folders(src="backup/photos", dst="library/photos", run_log=True)
 print(stats)
+
+# Windows-style conflict names: photo (1).jpg, photo (2).jpg, ...
+stats = merge_folders(src="backup/photos", dst="library/photos",
+                      rename_format="{stem} ({i}){suffix}", rename_start=1)
 ```
 
 ### 8) Copy/move a folder while preserving symbolic links
@@ -246,7 +250,10 @@ move(src="game/mod", dst="backup/mod", retarget_symlinks=True, run_log=True)
 - `exist_policy`:
   - `default`: keep default behavior
   - `overwrite`: remove existing destination file first
-  - `rename`: auto-generate destination suffix (`_0`, `_1`, ...)
+  - `rename`: auto-generate destination suffix (`_0`, `_1`, ...; pattern configurable via `rename_format`/`rename_start`)
+- `rename_format` (default `'{stem}_{i}{suffix}'`): template for the auto-renamed destination used by `exist_policy="rename"`, applied to the destination **file name** (candidates stay in the directory of `dst`). Placeholders: `{stem}` (file name without its final suffix), `{suffix}` (final suffix with its leading dot, empty for names like `README`), `{i}` (candidate index, format specs supported, e.g. `{i:03d}` for zero padding; literal braces as `{{`/`}}`).
+- `rename_start` (default `0`): first candidate index; use `1` for Windows-style `name_1.ext` numbering.
+- An invalid template (unknown placeholders, no placeholder varying with the index) or a negative or non-integer `rename_start` raises `ValueError` when the rename is actually attempted — also in `dry_run` mode, so previews double as feasibility checks.
 - `make_dir=True` creates missing destination parent directories.
 - `exist_policy` applies only when `dst` exists as a **file**; when `dst` is missing or an existing directory it is ignored (file/directory `src` is then placed into `dst/<basename(src)>`, or `copytree` raises `FileExistsError` for a directory `src` onto an existing directory).
 - `preserve_symlinks` (`copy` only, default `False`): symlinks are kept as links instead of followed — a symlink `src` is recreated at `dst` with its original target, and links inside a copied directory tree are recreated as links (original targets unchanged).
@@ -259,7 +266,7 @@ move(src="game/mod", dst="backup/mod", retarget_symlinks=True, run_log=True)
 ### `operator.merge_folders`
 
 - Never overwrites: on name conflict the destination file is kept, and the source file is copied under an auto-renamed name.
-- Rename format is `stem_0.ext`, `stem_1.ext`, ... (same as `operator.move/copy` with `exist_policy="rename"`).
+- Rename format defaults to `stem_0.ext`, `stem_1.ext`, ... and is configurable via `rename_format` / `rename_start` (same template semantics as `operator.move/copy` with `exist_policy="rename"`; an invalid template raises `ValueError` before any file is copied).
 - Files are matched by relative path:
   - destination missing -> direct copy with parent directories created
   - identical SHA-256 -> skipped

@@ -26,9 +26,9 @@ user-invocable: true
   - `is_same_folder(folder1, folder2, match_func=None, file_compare_mode='hash')`: check if two folders contain identical files recursively.
 - `filelib.operator`
   - `remove(...)`: remove files/directories with `dry_run`, `run_log`, and `recursive` controls.
-  - `move(...)`: move files/directories with `exist_policy`, `make_dir`, and `dry_run` controls; `retarget_symlinks=True` retargets in-tree absolute links after a move.
-  - `copy(...)`: copy files/directories with `exist_policy`, `make_dir`, and `dry_run` controls; `preserve_symlinks=True` keeps symlinks as links, `retarget_symlinks=True` rewrites in-tree absolute targets in the copy.
-  - `merge_folders(src, dst, dry_run=False, run_log=False)`: one-way merge of `src` into `dst`; never overwrites (skip on same SHA-256, auto-rename on conflict); returns `{'copied', 'skipped', 'renamed'}` statistics.
+  - `move(...)`: move files/directories with `exist_policy`, `make_dir`, and `dry_run` controls; `retarget_symlinks=True` retargets in-tree absolute links after a move; `rename_format`/`rename_start` control the auto-rename pattern used by `exist_policy='rename'`.
+  - `copy(...)`: copy files/directories with `exist_policy`, `make_dir`, and `dry_run` controls; `preserve_symlinks=True` keeps symlinks as links, `retarget_symlinks=True` rewrites in-tree absolute targets in the copy; `rename_format`/`rename_start` control the auto-rename pattern used by `exist_policy='rename'`.
+  - `merge_folders(src, dst, dry_run=False, run_log=False, rename_format='{stem}_{i}{suffix}', rename_start=0)`: one-way merge of `src` into `dst`; never overwrites (skip on same SHA-256, auto-rename on conflict); returns `{'copied', 'skipped', 'renamed'}` statistics.
 - `filelib.downloader`
   - `download_response(...)`: download HTTP response content to local file, returns status code.
 - `filelib.identifier`
@@ -47,6 +47,9 @@ user-invocable: true
 - `operator.move/copy` supports `exist_policy` values: `default | overwrite | rename`.
 - `operator.move/copy` requires `make_dir=True` when destination parent does not exist.
 - `operator.move/copy` `exist_policy` applies only when `dst` exists as a file; it is ignored for missing/directory `dst`.
+- `operator.move/copy/merge_folders` auto-rename pattern: `rename_format` (default `'{stem}_{i}{suffix}'`, i.e. `stem_0.ext`) applied to the destination **file name** with placeholders `{stem}` (name without final suffix), `{suffix}` (final suffix with leading dot, possibly empty) and `{i}` (candidate index; format specs like `{i:03d}` supported); `rename_start` (default `0`) is the first index.
+  - `{i}` (or an index-dependent placeholder) is required: unknown placeholders or a constant template raise `ValueError` when the rename fires — also in `dry_run`, so previews double as feasibility checks.
+  - `merge_folders` validates the spec up front (before any file is copied).
 - `operator.copy` `preserve_symlinks` (default `False`) — with `True` symlinks are kept as links (a symlink `src` recreated with its original target; inner links of a tree recreated as links).
 - `operator.move/copy` `retarget_symlinks` (default `False`) — with a real-directory `src`, absolute link targets inside `src` are rewritten to the corresponding location under `dst` after the copy/move; relative and outside-tree links are kept verbatim; single symlinks are never retargeted.
   - On `copy` it requires `preserve_symlinks=True`; otherwise a warning is printed and nothing is retargeted.
@@ -66,7 +69,7 @@ user-invocable: true
   - `match_func` filters files to compare; if all filtered files match, folders are considered identical.
   - Empty folders or folders with all files filtered out are considered identical.
 - `operator.merge_folders` never overwrites existing destination files.
-  - Same relative path + same SHA-256: skipped; different content or non-file destination: copied as `stem_0.ext` / `stem_1.ext`.
+  - Same relative path + same SHA-256: skipped; different content or non-file destination: copied as `stem_0.ext` / `stem_1.ext` (default; configurable via `rename_format`/`rename_start`).
   - Empty source directories are not created; extra destination files are untouched.
   - `dry_run=True` still hashes, so returned statistics are exact.
   - Raises `FileNotFoundError` (missing path) / `ValueError` (not a directory, same folder, or `dst` inside `src`).
@@ -176,6 +179,10 @@ from filelib.operator import merge_folders
 stats = merge_folders('incoming', 'archive', dry_run=True)   # preview
 stats = merge_folders('incoming', 'archive', run_log=True)   # execute
 print(stats)
+
+# Windows-style conflict names: file (1).txt, file (2).txt, ...
+stats = merge_folders('incoming', 'archive',
+                      rename_format='{stem} ({i}){suffix}', rename_start=1)
 ```
 
 ### 7) Copy/move a folder while preserving symbolic links
@@ -201,6 +208,8 @@ move('game/mod', 'backup/mod', retarget_symlinks=True, run_log=True)
   - Add `make_dir=True` for `move/copy` if parent path is missing.
 - `ValueError: exist_policy must be ...`:
   - Use one of `default`, `overwrite`, or `rename`.
+- `ValueError: Invalid rename_format ...` / `rename_start must be ...`:
+  - Use only the placeholders `{stem}`, `{suffix}`, `{i}` and keep a placeholder that varies with the index; make `rename_start` a non-negative int.
 - `Invalid path_type`:
   - Use one of `file_only`, `raw_full_path`, `abs_full_path`, or `rel_path`.
 - Unsupported MIME errors:

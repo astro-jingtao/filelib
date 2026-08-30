@@ -26,9 +26,9 @@ user-invocable: true
   - `is_same_folder(folder1, folder2, match_func=None, file_compare_mode='hash')`: 递归检查两个文件夹是否包含相同的文件。
 - `filelib.operator`
   - `remove(...)`: 删除文件/目录，支持 `dry_run`、`run_log`、`recursive`。
-  - `move(...)`: 移动文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`；`retarget_symlinks=True` 移动后重映射树内绝对链接。
-  - `copy(...)`: 复制文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`；`preserve_symlinks=True` 将符号链接保留为链接，`retarget_symlinks=True` 重映射副本中的树内绝对链接。
-  - `merge_folders(src, dst, dry_run=False, run_log=False)`: 将 `src` 单向合并进 `dst`；永不覆盖（SHA-256 相同跳过，冲突自动改名）；返回 `{'copied', 'skipped', 'renamed'}` 统计。
+  - `move(...)`: 移动文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`；`retarget_symlinks=True` 移动后重映射树内绝对链接；`rename_format`/`rename_start` 控制 `exist_policy='rename'` 的自动改名格式。
+  - `copy(...)`: 复制文件/目录，支持 `exist_policy`、`make_dir`、`dry_run`；`preserve_symlinks=True` 将符号链接保留为链接，`retarget_symlinks=True` 重映射副本中的树内绝对链接；`rename_format`/`rename_start` 控制 `exist_policy='rename'` 的自动改名格式。
+  - `merge_folders(src, dst, dry_run=False, run_log=False, rename_format='{stem}_{i}{suffix}', rename_start=0)`: 将 `src` 单向合并进 `dst`；永不覆盖（SHA-256 相同跳过，冲突自动改名）；返回 `{'copied', 'skipped', 'renamed'}` 统计。
 - `filelib.downloader`
   - `download_response(...)`: HTTP 下载到本地文件，返回状态码。
 - `filelib.identifier`
@@ -47,6 +47,9 @@ user-invocable: true
 - `operator.move/copy` 的 `exist_policy` 只支持 `default | overwrite | rename`。
 - `operator.move/copy` 在目标父目录不存在时，需显式设置 `make_dir=True`。
 - `operator.move/copy` 的 `exist_policy` 仅在 `dst` 是已存在**文件**时生效；`dst` 不存在或是目录时被忽略。
+- `operator.move/copy/merge_folders` 的自动改名格式：`rename_format`（默认 `'{stem}_{i}{suffix}'`，即 `stem_0.ext`）作用于目标**文件名**，占位符 `{stem}`（去掉最后一个后缀的文件名）、`{suffix}`（含前导点的后缀，可为空）、`{i}`（候选序号，支持 `{i:03d}` 等格式规格）；`rename_start`（默认 `0`）为起始序号。
+  - 模板必须包含随序号变化的占位符（如 `{i}`）：未知占位符或常量模板在触发改名时抛 `ValueError`——`dry_run` 下同样抛出，预览即可行性检查。
+  - `merge_folders` 会在拷贝任何文件之前先校验。
 - `operator.copy` 的 `preserve_symlinks`（默认 `False`）——开启后符号链接保留为链接（符号链接 `src` 按原目标重建；树内链接也重建为链接）。
 - `operator.move/copy` 的 `retarget_symlinks`（默认 `False`）——对真实目录 `src`，复制/移动后把绝对目标落在 `src` 内的链接重写到 `dst` 下对应位置；相对链接和树外链接保持原样；单个符号链接从不重映射。
   - 在 `copy` 上需要同时 `preserve_symlinks=True`，否则打印警告且不做任何重映射。
@@ -66,7 +69,7 @@ user-invocable: true
   - `match_func` 是可选过滤函数，只比较过滤后的文件。
   - 空目录或被完全过滤的目录视为相同。
 - `operator.merge_folders` 永不覆盖目标已有文件。
-  - 相对路径相同且 SHA-256 相同：跳过；内容不同或目标不是文件：以 `stem_0.ext` / `stem_1.ext` 改名复制。
+  - 相对路径相同且 SHA-256 相同：跳过；内容不同或目标不是文件：以 `stem_0.ext` / `stem_1.ext` 改名复制（默认，可通过 `rename_format`/`rename_start` 自定义）。
   - 源中空目录不会被创建；目标多出的文件不受影响。
   - `dry_run=True` 仍会计算哈希，返回的统计是准确的。
   - 抛出 `FileNotFoundError`（路径缺失）/ `ValueError`（非目录、同一文件夹或 `dst` 在 `src` 内）。
@@ -176,6 +179,10 @@ from filelib.operator import merge_folders
 stats = merge_folders('incoming', 'archive', dry_run=True)   # 预演
 stats = merge_folders('incoming', 'archive', run_log=True)   # 执行
 print(stats)
+
+# Windows 风格冲突名：file (1).txt、file (2).txt、……
+stats = merge_folders('incoming', 'archive',
+                      rename_format='{stem} ({i}){suffix}', rename_start=1)
 ```
 
 ### 7) 保留符号链接地复制/移动目录
@@ -201,6 +208,8 @@ move('game/mod', 'backup/mod', retarget_symlinks=True, run_log=True)
   - 对 `move/copy` 增加 `make_dir=True`。
 - 出现 `ValueError: exist_policy must be ...`:
   - 使用 `default | overwrite | rename` 之一。
+- 出现 `ValueError: Invalid rename_format ...` / `rename_start must be ...`:
+  - 模板只用占位符 `{stem}`、`{suffix}`、`{i}`，并保留随序号变化的占位符；`rename_start` 用非负整数。
 - 出现 `Invalid path_type`:
   - 使用 `file_only | raw_full_path | abs_full_path | rel_path`。
 - 出现不支持 MIME:
