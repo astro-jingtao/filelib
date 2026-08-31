@@ -8,11 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Windows/PowerShell environment. No specific conda environment is required; run pytest in whichever env the package is installed in.
+Windows/PowerShell environment. Tests must run in the `science` conda env (the one with `filelib` installed editable plus all runtime deps); the shell's default `python` is broken, so always use `conda run -n science python ...`.
 
 - Install (editable): `pip install -e .`
-- All tests: `pytest -q`
-- One test file: `pytest tests/test_checker.py -v`
+- All tests: `conda run -n science python -m pytest -q`
+- One test file: `conda run -n science python -m pytest tests/test_checker.py -v`
 - One test: `pytest "tests/test_checker.py::TestIsSameFile::test_is_same_file_hash_mode_identical"`
 - CLI smoke (after `pip install -e .`): `filelib --help`, `filelib copy --help`; without reinstalling: `python -m filelib.cli --help`
 - No linter or formatter is configured.
@@ -21,7 +21,7 @@ Windows/PowerShell environment. No specific conda environment is required; run p
 
 - `src` layout; runtime dependencies (`requests`, `puremagic`, `image_complete`) are declared in pyproject.toml.
 - One small, single-purpose module per concern under `src/filelib/`:
-  - `scanner.py` — `ls()`, the package's canonical traversal API
+  - `scanner.py` — `ls()` (the package's canonical traversal API) and `is_empty_dir()` (shallow by default, `recursive=True` treats dirs holding only empty subdirs as empty)
   - `operator.py` — `remove`/`move`/`copy`/`merge_folders` with `dry_run`/`run_log`/`exist_policy`/`make_dir`
   - `checker.py` — `is_same_file`/`is_same_folder`
   - `resolver.py` — `is_same_path`
@@ -33,7 +33,7 @@ Windows/PowerShell environment. No specific conda environment is required; run p
 - `__init__.py` deliberately exports only a subset (`deploy_skill`, `deploy_filelib`, `is_same_file`, `is_same_folder`); consumers import other functions from submodules.
 - `skill_deployer` deploys the built-in skill folder `doc/agent/` (`SKILL.md` + `SKILL_zh.md`) to Copilot (`<root>/.github/skills` or `~/.copilot/skills`) and/or Claude (`<root>/.claude/skills` or `~/.claude/skills`). `_get_filelib_skill_dir()` locates the repo root via `Path(__file__).parents[2]`, which assumes the src layout — keep this in mind when refactoring.
 - Windows specifics: symlink creation needs admin/Developer Mode. Tests skip or tolerate this (`tests/test_scanner.py::_prepare_symlink_tree`, `tests/test_skill_deployer.py::test_project_symlink`).
-- Known gaps (also tracked in README "Current Limitations"): `scanner.is_empty_dir` is a `...` placeholder; `download_response` does not create parent directories; `operator.copy` has an unresolved recursion TODO.
+- Known gaps (also tracked in README "Current Limitations"): `download_response` does not create parent directories; `operator.copy` has an unresolved recursion TODO.
 
 ## Conventions
 

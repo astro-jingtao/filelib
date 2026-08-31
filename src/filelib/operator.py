@@ -8,7 +8,7 @@ from pathlib import Path
 from filelib.checker import is_same_file
 from filelib.printer import Printer
 from filelib.resolver import is_same_path
-from filelib.scanner import ls
+from filelib.scanner import is_empty_dir, ls
 
 
 def remove(path, recursive=False, dry_run=False, run_log=False):
@@ -35,7 +35,7 @@ def remove(path, recursive=False, dry_run=False, run_log=False):
 
     # 如果是文件夹，需要检查是否非空以应对 recursive=False 或 'skip' 的情况
     if is_dir:
-        is_empty = not os.listdir(path)
+        is_empty = is_empty_dir(path)
 
         # 处理非空文件夹的逻辑
         if not is_empty:

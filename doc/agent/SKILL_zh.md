@@ -18,7 +18,7 @@ user-invocable: true
 ## 模块能力地图
 - `filelib.scanner`
   - `ls(...)`: 目录扫描与过滤，支持递归与多种返回路径格式。
-  - `is_empty_dir(...)`: 当前是占位实现（`...`），不要在自动流程里使用。
+  - `is_empty_dir(directory, recursive=False)`: 判断目录是否为空；默认浅层判断（任何条目都算内容），`recursive=True` 时只含空子目录也算空（与 `ls()` 一致会跟随目录软链接）；路径不存在或非目录分别抛出 `FileNotFoundError`/`NotADirectoryError`。
 - `filelib.resolver`
   - `is_same_path(path1, path2)`: 通过 `Path.resolve()` 比较是否同一路径。
 - `filelib.checker`
@@ -223,5 +223,4 @@ move('game/mod', 'backup/mod', retarget_symlinks=True, run_log=True)
 
 ## 注意事项
 - 本 skill 基于当前仓库实现，不假设额外封装层。
-- `scanner.is_empty_dir` 尚未实现，若需要请先补全该函数后再纳入自动流程。
 - 如需让 VS Code 自动发现该 skill，建议同步放置到 `.github/skills/filelib-agent/SKILL.md`。

@@ -25,6 +25,7 @@ pip install -e .
 
 - `filelib.scanner`
   - `ls`: list files with filter, recursion, and path formatting options
+  - `is_empty_dir`: check whether a directory is empty (shallow by default; `recursive=True` treats directories holding only empty subdirectories as empty)
 - `filelib.operator`
   - `remove`: delete file/folder with `recursive` control
   - `move`: move path with destination conflict policies; `retarget_symlinks` retargets in-tree absolute links after a move
@@ -287,6 +288,13 @@ Notes:
   - `warn`
   - `ignore`
 
+### `scanner.is_empty_dir`
+
+- `recursive` behavior:
+  - `False` (default): the directory is empty only when it contains no entries at all — files, subdirectories, and hidden entries such as `.gitkeep` all count as content
+  - `True`: the directory is empty when it contains no files at any depth, i.e. a directory holding only empty subdirectories (arbitrarily nested) counts as empty; directory symlinks are followed (same default as `ls()`)
+- Raises `FileNotFoundError` if the path does not exist, and `NotADirectoryError` if it exists but is not a directory.
+
 ### `operator.remove`
 
 - `recursive` behavior:
@@ -374,7 +382,6 @@ pytest -q
 
 ## Current Limitations
 
-- `scanner.is_empty_dir` is currently a placeholder and not implemented.
 - `download_response` does not create parent directories automatically.
 - `merge_folders` follows directory symlinks while scanning; symlink cycles are not detected and can cause duplicated traversal or statistics.
 - `move` preserves symlinks inherently (`shutil.move` behavior); `retarget_symlinks=True` only adds the in-tree retargeting pass.

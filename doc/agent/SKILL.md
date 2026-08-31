@@ -18,7 +18,7 @@ user-invocable: true
 ## Module Capability Map
 - `filelib.scanner`
   - `ls(...)`: directory scanning and filtering with recursive support and multiple path formats.
-  - `is_empty_dir(...)`: currently a placeholder (`...`); do not use in automated flows.
+  - `is_empty_dir(directory, recursive=False)`: check whether a directory is empty; shallow by default (any entry counts as content), `recursive=True` treats directories holding only empty subdirectories as empty (follows directory symlinks like `ls()`); raises `FileNotFoundError`/`NotADirectoryError` for missing or non-directory paths.
 - `filelib.resolver`
   - `is_same_path(path1, path2)`: compares paths after `Path.resolve()` normalization.
 - `filelib.checker`
@@ -223,5 +223,4 @@ move('game/mod', 'backup/mod', retarget_symlinks=True, run_log=True)
 
 ## Notes
 - This skill reflects the current repository implementation directly.
-- `scanner.is_empty_dir` is not implemented yet; do not include it in automation until implemented.
 - For automatic VS Code skill discovery, you can mirror this file to `.github/skills/filelib-agent/SKILL.md`.
