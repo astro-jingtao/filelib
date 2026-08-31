@@ -14,6 +14,7 @@ Windows/PowerShell environment. No specific conda environment is required; run p
 - All tests: `pytest -q`
 - One test file: `pytest tests/test_checker.py -v`
 - One test: `pytest "tests/test_checker.py::TestIsSameFile::test_is_same_file_hash_mode_identical"`
+- CLI smoke (after `pip install -e .`): `filelib --help`, `filelib copy --help`; without reinstalling: `python -m filelib.cli --help`
 - No linter or formatter is configured.
 
 ## Architecture
@@ -28,6 +29,7 @@ Windows/PowerShell environment. No specific conda environment is required; run p
   - `identifier.py` — MIME detection + image completeness checks
   - `printer.py` — `Printer`, internal helper for dry-run/run-log/warning output used by `operator`
   - `skill_deployer.py` — `deploy_skill`/`deploy_filelib`
+  - `cli.py` — argparse console entry point `filelib` (`copy|move|merge|check-image`, `main(argv) -> int`) over `operator`/`identifier`; exit codes 0/1/2, run log on by default, `copy --retarget-symlinks` implies `--preserve-symlinks`
 - `__init__.py` deliberately exports only a subset (`deploy_skill`, `deploy_filelib`, `is_same_file`, `is_same_folder`); consumers import other functions from submodules.
 - `skill_deployer` deploys the built-in skill folder `doc/agent/` (`SKILL.md` + `SKILL_zh.md`) to Copilot (`<root>/.github/skills` or `~/.copilot/skills`) and/or Claude (`<root>/.claude/skills` or `~/.claude/skills`). `_get_filelib_skill_dir()` locates the repo root via `Path(__file__).parents[2]`, which assumes the src layout — keep this in mind when refactoring.
 - Windows specifics: symlink creation needs admin/Developer Mode. Tests skip or tolerate this (`tests/test_scanner.py::_prepare_symlink_tree`, `tests/test_skill_deployer.py::test_project_symlink`).

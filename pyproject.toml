@@ -17,6 +17,9 @@ dependencies = [
     "image_complete",
 ]
 
+[project.scripts]
+filelib = "filelib.cli:main"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 packages = { find = { where = ["src"] } }

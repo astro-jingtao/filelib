@@ -487,6 +487,27 @@ class TestCopy:
         assert dst_file.exists()
         assert dst_file.read_text() == "source content"
 
+    def test_copy_relative_dst_bare_filename(self, monkeypatch):
+        """Regression: 相对路径 dst 只有文件名时，父目录应视为 cwd 而非空串
+
+        os.path.dirname('out.txt') 返回 ''，而 os.path.exists('') 恒为
+        False，曾导致对 cwd 的复制误报 FileNotFoundError。"""
+        monkeypatch.chdir(self.dst_dir)
+
+        copy(str(self.src_file), "out.txt")
+
+        assert (self.dst_dir / "out.txt").read_text() == "source content"
+
+    def test_copy_relative_dst_make_dir(self, monkeypatch):
+        """相对路径 dst + make_dir=True：在 cwd 下创建缺失的父目录"""
+        monkeypatch.chdir(self.dst_dir)
+
+        copy(str(self.src_file), os.path.join("new_sub", "deep", "out.txt"),
+             make_dir=True)
+
+        assert (self.dst_dir / "new_sub" / "deep" / "out.txt").read_text() \
+            == "source content"
+
     def test_copy_to_existing_directory_success(self):
         """目标为已有目录：复制后文件进入该目录"""
         copy(str(self.src_file), str(self.dst_dir))

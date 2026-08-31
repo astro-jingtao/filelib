@@ -41,6 +41,11 @@ def is_file_corrupted(file_path: Path | str,
                       mime_method='magic',
                       unsupported_policy='return',
                       unsupported_return=None) -> bool | None:
+    # image_complete's load() only accepts str/bytes/BytesIO; a Path makes
+    # every checker return False (false "corrupted" + "Unhandled data
+    # type" noise), so normalize before dispatching.
+    file_path = str(file_path)
+
     if mime is None:
         if mime_method == 'magic':
             mime = get_mime_magic(file_path)

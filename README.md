@@ -41,6 +41,8 @@ pip install -e .
   - `get_mime_magic`: MIME detection by file signature
   - `get_mime_extension`: MIME detection by extension
   - `is_file_corrupted`: image completeness check for common formats
+- `filelib.cli`
+  - `main`: console entry point `filelib` with `copy` / `move` / `merge` / `check-image` subcommands mirroring `operator` and `identifier` (see [Command Line Interface](#command-line-interface))
 - `filelib.printer`
   - internal helper used for `dry_run`, run logs, and warning messages
 - `filelib.skill_deployer`
@@ -218,6 +220,54 @@ copy(src="game/mod", dst="backup/mod", preserve_symlinks=True,
 # additionally fixes absolute in-tree links, which would otherwise dangle
 move(src="game/mod", dst="backup/mod", retarget_symlinks=True, run_log=True)
 ```
+
+## Command Line Interface
+
+Installing the package registers the `filelib` console script (also available without reinstalling as `python -m filelib.cli`). It is a thin adapter over the Python API — same flags, same output conventions (`[dry-run]` previews, run-log lines, `[RETARGET]` / `[COPY]` / `[SKIP]` / `[RENAME]` traces):
+
+```powershell
+filelib copy SRC DST [--exist-policy {default,overwrite,rename}] [--make-dir]
+           [--preserve-symlinks] [--retarget-symlinks] [--dry-run]
+           [--run-log | --no-run-log] [--rename-format FMT] [--rename-start N]
+filelib move SRC DST [--exist-policy ...] [--make-dir] [--retarget-symlinks]
+           [--dry-run] [--run-log | --no-run-log] [--rename-format FMT] [--rename-start N]
+filelib merge SRC DST [--dry-run] [--run-log | --no-run-log]
+            [--rename-format FMT] [--rename-start N]
+filelib check-image FILE [FILE ...] [--mime-method {magic,extension}]
+```
+
+Preview-then-execute flow (recommended for anything destructive):
+
+```powershell
+# 1. Preview: prints [dry-run] lines, touches nothing
+filelib copy game/mod backup/mod --retarget-symlinks --dry-run
+
+# 2. Execute: symlinks are kept as links and in-tree absolute targets are
+#    rewritten to point into the copy (--retarget-symlinks implies
+#    --preserve-symlinks, unlike the Python API which warns and disables)
+filelib copy game/mod backup/mod --retarget-symlinks
+
+# Windows-style conflict names: report_1.txt, report_2.txt, ...
+filelib copy report.txt archive\report.txt --exist-policy rename --rename-start 1
+
+# Create missing parent directories of the destination
+filelib move incoming\data.txt sorted\2026\data.txt --make-dir
+
+# Folder merge: never overwrites; dry-run prints exact statistics
+filelib merge backup\photos library\photos --dry-run
+filelib merge backup\photos library\photos
+
+# Batch image check in a pipeline
+filelib check-image (Get-ChildItem -Recurse -Filter *.png).FullName
+if ($LASTEXITCODE -eq 1) { Write-Host "corrupted images found" }
+```
+
+Notes:
+
+- The run log is **on by default** in the CLI (`--no-run-log` to silence); this is the only default that differs from the Python API.
+- Exit codes: `0` success (`check-image`: no corrupted files and no per-file errors); `1` runtime error or corrupted files found; `2` usage error.
+- `check-image` prints one `<path>: ok|corrupted|unsupported` line per file plus a `Summary:` line. Unsupported MIME types (anything beyond jpeg/png/gif/bmp/webp) do **not** affect the exit code. Per-file errors (missing file; content that cannot be identified with `--mime-method magic`, e.g. an empty or non-image file) are reported on stderr as `Error: <path>: <message>` and the remaining files are still checked; any such error makes the exit code `1`.
+- PowerShell does not expand wildcards for native commands — pass a list as in the example above, and single-quote templates like `'{stem}_{i}{suffix}'` so braces stay literal.
 
 ## API Notes and Behaviors
 

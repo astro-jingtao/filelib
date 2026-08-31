@@ -37,6 +37,8 @@ user-invocable: true
   - `is_file_corrupted(...)`: 检查图片是否损坏（jpeg/png/gif/bmp/webp）。
 - `filelib.printer`
   - `Printer`: 给 operator 系列函数提供 dry-run/run-log/warning 输出行为。
+- `filelib.cli`
+  - `main(argv)`: 控制台入口 `filelib`（`copy` / `move` / `merge` / `check-image` 子命令），与 `operator`/`identifier` API 一一对应；run log 默认开启（`--no-run-log` 关闭）；退出码 `0` 成功 / `1` 运行时错误或发现损坏 / `2` 用法错误。
 
 ## 关键行为约束
 - `scanner.ls` 的 `path_type` 实际默认值是 `abs_full_path`。
@@ -68,6 +70,8 @@ user-invocable: true
   - 文件按相对路径配对；相对路径要完全匹配。
   - `match_func` 是可选过滤函数，只比较过滤后的文件。
   - 空目录或被完全过滤的目录视为相同。
+- CLI 的 `filelib copy --retarget-symlinks` 隐含 `--preserve-symlinks`（与 Python API 不同：后者在未开 `preserve_symlinks` 时只打印警告并禁用重映射）。
+- CLI 的 `filelib check-image` 逐文件输出 `<路径>: ok|corrupted|unsupported` 并附 `Summary:` 行；不支持的 MIME 不影响退出码；单文件错误（文件缺失、`--mime-method magic` 下内容无法识别）打到 stderr 并使退出码为 `1`。
 - `operator.merge_folders` 永不覆盖目标已有文件。
   - 相对路径相同且 SHA-256 相同：跳过；内容不同或目标不是文件：以 `stem_0.ext` / `stem_1.ext` 改名复制（默认，可通过 `rename_format`/`rename_start` 自定义）。
   - 源中空目录不会被创建；目标多出的文件不受影响。

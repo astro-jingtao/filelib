@@ -37,6 +37,8 @@ user-invocable: true
   - `is_file_corrupted(...)`: corruption check for jpeg/png/gif/bmp/webp.
 - `filelib.printer`
   - `Printer`: output behavior used by operator functions for dry-run/log/warning messages.
+- `filelib.cli`
+  - `main(argv)`: console entry point `filelib` (`copy` / `move` / `merge` / `check-image`) mirroring the `operator`/`identifier` APIs; run log on by default (`--no-run-log` to silence); exit codes `0` success / `1` runtime error or corrupted files found / `2` usage error.
 
 ## Critical Behavior Constraints
 - `scanner.ls` actual default for `path_type` is `abs_full_path`.
@@ -68,6 +70,8 @@ user-invocable: true
   - Files are matched by relative path within their respective folders.
   - `match_func` filters files to compare; if all filtered files match, folders are considered identical.
   - Empty folders or folders with all files filtered out are considered identical.
+- CLI `filelib copy --retarget-symlinks` implies `--preserve-symlinks` (unlike the Python API, which warns and disables retargeting when `preserve_symlinks` is off).
+- CLI `filelib check-image` prints `<path>: ok|corrupted|unsupported` per file plus a `Summary:` line; unsupported MIME types do not affect the exit code; per-file errors (missing file, unidentifiable content with `--mime-method magic`) go to stderr and make the exit code `1`.
 - `operator.merge_folders` never overwrites existing destination files.
   - Same relative path + same SHA-256: skipped; different content or non-file destination: copied as `stem_0.ext` / `stem_1.ext` (default; configurable via `rename_format`/`rename_start`).
   - Empty source directories are not created; extra destination files are untouched.

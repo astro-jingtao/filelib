@@ -589,7 +589,8 @@ def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
         if True, create the parent folder of dst if not exist, otherwise raise error
     """
 
-    dst_folder = os.path.dirname(dst)
+    # a bare file name has no dirname ('' does not exist); its parent is the cwd
+    dst_folder = os.path.dirname(dst) or '.'
     if not os.path.exists(dst_folder):
         if make_dir:
             if not dry_run:
