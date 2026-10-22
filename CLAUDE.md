@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`filelib` is a small personal-reuse Python (>= 3.9) library of file-handling utilities: directory scanning, move/copy/remove, path/file/folder comparison, HTTP downloads, image corruption checks, folder merging, and a CLI over the core operations. Full API documentation with exact parameter semantics (`path_type`, `exist_policy`, `recursive` modes) lives in README.md — extend it when changing behavior. The agent-facing usage skill (toolkit map, behavior tables, recipes) lives in `skills/filelib/skill/SKILL.md` — consult it for how to use filelib as an agent.
+`filelib` is a small personal-reuse Python (>= 3.9) library of file-handling utilities: directory scanning, move/copy/remove, path/file/folder comparison, HTTP downloads, image corruption checks, folder merging, and a CLI over the core operations. Full API documentation with exact parameter semantics (`path_type`, `exist_policy`, `recursive` modes) lives in README.md — extend it when changing behavior. The agent-facing usage skill (toolkit map, behavior tables, recipes) ships inside the package at `src/filelib/skills/filelib/skill/SKILL.md` (package data, discovered via `python -m filelib.skills`) — consult it for how to use filelib as an agent.
 
 ## Commands
 
@@ -39,6 +39,6 @@ These come from `.github/copilot-instructions.md` and apply to Claude Code as we
 
 - Prefer filelib APIs over stdlib inside package code: `scanner.ls()` over `os.walk()`/`rglob()`, `resolver.is_same_path()` over `Path.resolve()`, `operator` functions over raw `os`/`shutil` mutations. (`checker.is_same_folder` follows this by building on `scanner.ls`.)
 - Absolute imports only (`from filelib.scanner import ls`), never relative imports.
-- "更新文档" (update the docs) means updating both of: `README.md`, `skills/filelib/skill/SKILL.md`.
+- "更新文档" (update the docs) means updating both of: `README.md`, `src/filelib/skills/filelib/skill/SKILL.md`.
 - Tests are pytest class-based and mirror modules (`test_scanner.py`, `test_operator.py`, ...); always use `tmp_path` for test files. Comments/docstrings mix English and Chinese — match the style of the file being edited.
 - `TODO/` holds pending design notes (e.g. `CLI.md`, `checker.md`).

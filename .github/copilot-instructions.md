@@ -5,7 +5,7 @@ Repository conventions:
 - Run tests in conda environment `science` (not `base`).
 - In this repo, "更新文档" means updating both of:
   - `README.md`
-  - `skills/filelib/skill/SKILL.md`
+  - `src/filelib/skills/filelib/skill/SKILL.md`
 
 ## Code Style Guidelines
 

@@ -23,3 +23,9 @@ filelib = "filelib.cli:main"
 [tool.setuptools]
 package-dir = { "" = "src" }
 packages = { find = { where = ["src"] } }
+
+[tool.setuptools.package-data]
+# the skills tree ships with the distribution — an installed package whose
+# skills directory came out empty is a landing defect. Explicit patterns:
+# code files (__init__/__main__) ship as package code, everything else as data
+"filelib.skills" = ["SKILL-DEPLOY.md", "filelib/meta.yaml", "filelib/skill/**/*"]

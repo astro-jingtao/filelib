@@ -47,6 +47,8 @@ pip install -e .
   - `main`: console entry point `filelib` with `copy` / `move` / `merge` / `check-image` subcommands mirroring `operator` and `identifier` (see [Command Line Interface](#command-line-interface))
 - `filelib.printer`
   - internal helper used for `dry_run`, run logs, and warning messages
+- `filelib.skills`
+  - the agent-facing usage skill shipped as package data (`filelib/skills/filelib/skill/SKILL.md`, deployment guide `filelib/skills/SKILL-DEPLOY.md`); `python -m filelib.skills` prints the installed skills root
 
 ## Quick Start
 

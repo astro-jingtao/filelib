@@ -1,22 +1,36 @@
-# Deploying the Skills Shipped in This Repository
+# Deploying the Skills Shipped in This Package
 
-This repository ships Claude Agent Skills under `skills/`. This guide is written for the agent (or person) deploying them on a machine that carries no dedicated skill-deployment tooling — everything needed is in this file.
+The `filelib` Python package ships Claude Agent Skills as package data, inside the installed package under `filelib.skills`. This guide is written for the agent (or person) deploying them on a machine that carries no dedicated skill-deployment tooling — everything needed is in this file.
 
-Currently shipped: **`filelib`** — the agent-facing usage guide for the `filelib` package (directory scanning, move/copy/remove/merge with dry-run previews and conflict policies, path and content comparison, HTTP downloads, image corruption checks, and the `filelib` CLI). The skill drives this repository's own Python package, so installing the package is part of satisfying its `requires` entries.
+Currently shipped: **`filelib`** — the agent-facing usage guide for the `filelib` package (directory scanning, move/copy/remove/merge with dry-run previews and conflict policies, path and content comparison, HTTP downloads, image corruption checks, and the `filelib` CLI).
 
-Paths below are relative to the repository root; this file sits at `skills/SKILL-DEPLOY.md` inside it.
+## Find the skills root
+
+All paths below resolve through the **installed package**, never a repository checkout. Print the absolute skills root with:
+
+```powershell
+python -m filelib.skills
+```
+
+```text
+C:\...\site-packages\filelib\skills
+Deployment guide: C:\...\site-packages\filelib\skills\SKILL-DEPLOY.md
+```
+
+The rest of this guide writes `<skills-root>` for that printed path. Without the module, the equivalent one-liner: `python -c "from importlib.resources import files; print(files('filelib') / 'skills')"`.
 
 ## What a skill entry looks like
 
-Each skill occupies two layers:
+Each skill occupies two layers under `<skills-root>`:
 
 ```text
-skills/<name>/            container (a repository concept)
-├── skill/                the skill proper — SKILL.md plus supporting files
-└── meta.yaml             external-dependency metadata — read, never deployed
+<skills-root>/
+└── <name>/
+    ├── skill/            the skill proper — SKILL.md plus supporting files
+    └── meta.yaml         external-dependency metadata — read, never deployed
 ```
 
-Only `skills/<name>/skill/` is deployed. `meta.yaml` stays behind: it declares what the skill expects from its environment, and you read it before linking (next section).
+Only `<skills-root>/<name>/skill/` is deployed. `meta.yaml` stays behind: it declares what the skill expects from its environment, and you read it before linking (next section).
 
 ## Deployment is a directory link
 
@@ -24,36 +38,36 @@ Make a skill visible to Claude Code by linking its `skill/` directory into a ski
 
 | target | link path | points at |
 | ------ | --------- | --------- |
-| user level (every project) | `~/.claude/skills/<name>` | `<repo>/skills/<name>/skill` |
+| user level (every project) | `~/.claude/skills/<name>` | `<skills-root>/<name>/skill` |
 | project level (one project) | `<project>/.claude/skills/<name>` | same target |
 
-Prefer a link over a copy — a link reflects this repository's state as it changes; a copy drifts the moment either side changes. When a link is impossible (privilege, filesystem), copy the directory instead and note that later updates to this repository will not reach the copy.
+Prefer a link over a copy — a link reflects the installed package as it is upgraded; a copy drifts the moment either side changes. When a link is impossible (privilege, filesystem), copy the directory instead and note that package upgrades will not reach the copy.
 
-Commands — replace `<repo>` with this repository's absolute path:
+Commands — replace `<skills-root>` with the printed path:
 
 Linux / macOS:
 
 ```bash
-ln -s <repo>/skills/filelib/skill ~/.claude/skills/filelib
+ln -s <skills-root>/filelib/skill ~/.claude/skills/filelib
 ```
 
 Windows (PowerShell):
 
 ```powershell
-New-Item -ItemType SymbolicLink -Path "$HOME\.claude\skills\filelib" -Target "<repo>\skills\filelib\skill"
+New-Item -ItemType SymbolicLink -Path "$HOME\.claude\skills\filelib" -Target "<skills-root>\filelib\skill"
 ```
 
 Windows requires Developer Mode or the "Create symbolic links" account right to create a symlink; a failure mentioning privilege or WinError 1314 means neither is present — enable one, or fall back to a copy:
 
 ```powershell
-Copy-Item -Recurse <repo>\skills\filelib\skill "$HOME\.claude\skills\filelib"
+Copy-Item -Recurse <skills-root>\filelib\skill "$HOME\.claude\skills\filelib"
 ```
 
-Create a directory symlink, never a Windows junction: recursive removers (`git worktree remove`, `git clean`) walk through a junction into its target and can delete the repository's content, while a symlink is removed as the link itself.
+Create a directory symlink, never a Windows junction: recursive removers (`git worktree remove`, `git clean`) walk through a junction into its target and can delete the package's content, while a symlink is removed as the link itself.
 
 ## Before linking: read meta.yaml
 
-`skills/<name>/meta.yaml` declares the skill's expectations of its environment:
+`<skills-root>/<name>/meta.yaml` declares the skill's expectations of its environment:
 
 | field | meaning | what you do before deploying |
 | ----- | ------- | ---------------------------- |
@@ -62,7 +76,7 @@ Create a directory symlink, never a Windows junction: recursive removers (`git w
 | `claude-md` | content the environment's CLAUDE.md should carry | land it in the CLAUDE.md at its `scope` — global → the user's `~/.claude/CLAUDE.md`, project → the target project's `CLAUDE.md`. Check for equivalent existing content first; insert only what is missing, wrapped in the marker pair below. The inserted text states WHAT the discipline is and names the skill — the full HOW lives in the skill body, never in CLAUDE.md |
 | `integrates-with`, `notes` | informational linkage and operator notes | read; no action |
 
-For `filelib`, the `requires` entry names the `filelib` console script (`check: filelib --help`); when it is missing, install this repository's package from the repository root (`pip install -e .`).
+For `filelib`, the `requires` entry names the `filelib` console script (`check: filelib --help`); it is provided by the very package this skill ships with — when it is missing, the interpreter in use does not have `filelib` installed (`pip show filelib`; install the package, or select the environment where it is installed).
 
 A `kind: os` entry naming an OS that is not this machine's means this platform does not support the skill — deploying it is a conscious choice (it stays dormant off its platform), or skip it.
 
