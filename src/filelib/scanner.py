@@ -26,7 +26,7 @@ def ls(directory=".",
         * 'raw_full_path': Returns the path as concatenated during traversal.
         * 'abs_full_path': Returns the absolute system path.
         * 'rel_path': Returns the path relative to the input `directory`.
-        Defaults to 'file_only'.
+        Defaults to 'abs_full_path'.
     on_duplicates : {'raise', 'warn', 'ignore'}, optional
         Determines the behavior when duplicate file names are found:
         * 'raise': Raises a ValueError.
