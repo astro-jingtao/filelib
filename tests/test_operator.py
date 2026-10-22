@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 import filelib.operator as operator_module
-from filelib.operator import copy, get_unique_new_dst, merge_folders, move, remove
+from filelib.operator import (copy, dry_run_session, get_unique_new_dst,
+                              merge_folders, move, remove)
 
 
 class TestRemove:
@@ -1786,3 +1787,86 @@ class TestGetUniqueNewDst:
 
         with pytest.raises(RuntimeError, match="can not be found"):
             get_unique_new_dst(str(self.dir / "diff.txt"), 5)
+
+
+class TestDryRunSession:
+    """dry_run_session()：一批 dry-run 调用共享"虚拟已创建目录"状态，
+    使 Create directory 报告与对应的真实运行一致。"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path):
+        self.src = tmp_path / "src.txt"
+        self.src.write_text("content")
+        self.base = tmp_path / "base"
+        yield
+
+    def _dry_copy(self, dst, **kwargs):
+        copy(str(self.src), str(dst), dry_run=True, run_log=True, **kwargs)
+
+    def test_session_reports_create_dir_once(self, capsys):
+        """同一目录在会话内只报告一次创建"""
+        with dry_run_session():
+            self._dry_copy(self.base / "sub" / "a.txt", make_dir=True)
+            self._dry_copy(self.base / "sub" / "b.txt", make_dir=True)
+
+        out = capsys.readouterr().out
+        assert out.count("Create directory") == 1
+        assert out.count("[dry-run] Copied") == 2
+
+    def test_without_session_each_call_repeats_create_dir(self, capsys):
+        """无会话时保持原行为：每次调用都基于磁盘状态重复报告"""
+        self._dry_copy(self.base / "sub" / "a.txt", make_dir=True)
+        self._dry_copy(self.base / "sub" / "b.txt", make_dir=True)
+
+        out = capsys.readouterr().out
+        assert out.count("Create directory") == 2
+
+    def test_session_remembers_missing_ancestors(self, capsys):
+        """makedirs 会创建整条祖先链；会话记住后，落到祖先目录内不再报告，
+        更深的新目录仍正常报告（与真实运行一致）"""
+        with dry_run_session():
+            # 虚拟创建 base/x 与 base/x/y
+            self._dry_copy(self.base / "x" / "y" / "a.txt", make_dir=True)
+            # base/x 已虚拟存在 -> 不报告
+            self._dry_copy(self.base / "x" / "b.txt", make_dir=True)
+            # base/x/z 仍缺失 -> 报告
+            self._dry_copy(self.base / "x" / "z" / "c.txt", make_dir=True)
+
+        out = capsys.readouterr().out
+        assert out.count("Create directory") == 2
+
+    def test_session_virtual_dir_satisfies_make_dir_false(self, capsys):
+        """make_dir=False 的后续调用把虚拟目录视为存在，不再抛
+        FileNotFoundError（真实运行中该目录已被前一次调用创建）"""
+        with dry_run_session():
+            self._dry_copy(self.base / "v" / "a.txt", make_dir=True)
+            self._dry_copy(self.base / "v" / "b.txt", make_dir=False)
+
+        out = capsys.readouterr().out
+        assert out.count("Create directory") == 1
+        assert out.count("[dry-run] Copied") == 2
+
+    def test_real_run_ignores_session_state(self, capsys):
+        """真实运行不查会话：以磁盘为准正常创建、不重复报告"""
+        with dry_run_session():
+            self._dry_copy(self.base / "r" / "a.txt", make_dir=True)  # 仅虚拟创建
+            copy(str(self.src), str(self.base / "r" / "b.txt"),
+                 make_dir=True, run_log=True)  # 真实创建
+            copy(str(self.src), str(self.base / "r" / "c.txt"),
+                 make_dir=True, run_log=True)  # 磁盘已存在 -> 不报告
+
+        out = capsys.readouterr().out
+        assert out.count("Create directory") == 2  # 虚拟一次 + 真实一次
+        assert (self.base / "r" / "b.txt").exists()
+        assert (self.base / "r" / "c.txt").exists()
+
+    def test_move_uses_session_too(self, capsys):
+        """move 与 copy 共享同一会话状态"""
+        with dry_run_session():
+            self._dry_copy(self.base / "m" / "a.txt", make_dir=True)
+            move(str(self.src), str(self.base / "m" / "b.txt"),
+                 dry_run=True, make_dir=True, run_log=True)
+
+        out = capsys.readouterr().out
+        assert out.count("Create directory") == 1
+        assert "[dry-run] Moved" in out

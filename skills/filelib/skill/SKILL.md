@@ -44,6 +44,7 @@ After executing, confirm the outcome (`ls()`, `Path.exists()`, or the statistics
 | List / filter files | `scanner.ls(directory, match_func=None, recursive=False, path_type='abs_full_path', on_duplicates='raise', follow_symlinks=True)` |
 | Is a directory empty? | `scanner.is_empty_dir(directory, recursive=False)` |
 | Copy / move | `operator.copy(...)` / `operator.move(...)` — `exist_policy`, `make_dir`, symlink flags, `rename_format` |
+| Batch dry-run preview | wrap the batch in `with operator.dry_run_session():` — directories that would have been created are reported once |
 | Delete | `operator.remove(path, recursive=False)` |
 | Merge folders, never overwrite | `operator.merge_folders(src, dst)` → `{'copied', 'skipped', 'renamed'}` |
 | Same location? | `resolver.is_same_path(path1, path2)` |
@@ -82,6 +83,7 @@ What happens depends on what `dst` is; `exist_policy` applies only to the last r
 | existing **file** | `'default'` — `copy` silently overwrites, `move` replaces; `'overwrite'` — dst removed first; `'rename'` — first free name from `rename_format` |
 
 - An invalid `exist_policy` string raises only when the policy actually fires (existing-file `dst`).
+- Dry-run batches: a dry-run call never creates directories, so repeated calls into the same missing parent re-print `Create directory`. Wrap the batch in `with operator.dry_run_session():` and each directory is reported once, matching the real run (missing ancestors remembered like `os.makedirs`; destination *file* existence still comes from the real filesystem, and real runs ignore the session).
 - `rename_format` (default `'{stem}_{i}{suffix}'`) renders the destination **file name**; placeholders `{stem}`, `{suffix}` (may be empty), `{i}` (format specs such as `{i:03d}` allowed). The template must vary with the index — violations raise `ValueError` when a rename fires, in `dry_run` too. `merge_folders` validates the spec up front instead.
 - Copying follows symlinks by default; a dangling link inside a tree raises.
 

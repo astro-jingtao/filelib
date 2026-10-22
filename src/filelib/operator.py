@@ -1,14 +1,55 @@
 from __future__ import annotations
 
+import contextvars
 import os
 import shutil
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from filelib.checker import is_same_file
 from filelib.printer import Printer
 from filelib.resolver import is_same_path
 from filelib.scanner import is_empty_dir, ls
+
+# Directories virtually created by dry-run calls inside a dry_run_session():
+# None outside a session, otherwise a set of normalized absolute paths.
+# Only dry-run calls consult it; real runs always use the real filesystem.
+_dry_run_created_dirs = contextvars.ContextVar('filelib_dry_run_created_dirs',
+                                               default=None)
+
+
+@contextmanager
+def dry_run_session():
+    """Share one virtual directory state across dry-run calls.
+
+    A dry-run ``copy``/``move`` does not create directories, so in a
+    batch of dry-run calls every call whose destination parent is
+    missing re-prints ``Create directory <dir>`` for a directory the
+    batch would already have created — unlike the corresponding real
+    run, which prints the line only for the first call. Inside this
+    context, dry-run calls remember the directories they would have
+    created (including every missing ancestor, mirroring
+    ``os.makedirs``) and treat them as existing, so each directory is
+    reported exactly once, matching the real run.
+
+    The session affects dry-run calls only: real ``copy``/``move``
+    always read the real filesystem. Only directory creation is
+    tracked — destination *file* existence (auto-rename candidate
+    checks included) is still read from the real filesystem.
+
+    Examples
+    --------
+    >>> with dry_run_session():
+    ...     for name in files:
+    ...         copy(name, f'out/sub/{name}', dry_run=True, make_dir=True,
+    ...              run_log=True)
+    """
+    token = _dry_run_created_dirs.set(set())
+    try:
+        yield
+    finally:
+        _dry_run_created_dirs.reset(token)
 
 
 def remove(path, recursive=False, dry_run=False, run_log=False):
@@ -591,15 +632,48 @@ def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
 
     # a bare file name has no dirname ('' does not exist); its parent is the cwd
     dst_folder = os.path.dirname(dst) or '.'
-    if not os.path.exists(dst_folder):
+    # in dry-run, directories a previous call in the active session would
+    # have created count as existing, so each directory is reported once
+    created_dirs = _dry_run_created_dirs.get() if dry_run else None
+    if not _dir_would_exist(dst_folder, created_dirs):
         if make_dir:
             if not dry_run:
                 os.makedirs(dst_folder, exist_ok=False)
+            else:
+                _remember_dry_run_dirs(dst_folder, created_dirs)
             printer.print_general_run_log(f"Create directory {dst_folder}")
         else:
             raise FileNotFoundError(
                 f"Parent folder {dst_folder} of destination {dst} does not exist."
             )
+
+
+def _normalize_dir(folder):
+    """Normalize a directory path for dry-run session lookups: absolute
+    and case-folded where the platform is case-insensitive."""
+    return os.path.normcase(os.path.abspath(folder))
+
+
+def _dir_would_exist(folder, created_dirs):
+    """True if ``folder`` exists on disk, or was already virtually created
+    in the active dry-run session (``created_dirs`` is None outside one)."""
+    if os.path.exists(folder):
+        return True
+    return created_dirs is not None and _normalize_dir(folder) in created_dirs
+
+
+def _remember_dry_run_dirs(folder, created_dirs):
+    """Record ``folder`` and all its missing ancestors as virtually created
+    (mirroring what ``os.makedirs`` would create) in the dry-run session."""
+    if created_dirs is None:
+        return
+    probe = os.path.abspath(folder)
+    while not os.path.exists(probe):
+        created_dirs.add(_normalize_dir(probe))
+        parent = os.path.dirname(probe)
+        if parent == probe:  # reached the filesystem root
+            break
+        probe = parent
 
 
 def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer,

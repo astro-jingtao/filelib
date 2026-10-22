@@ -31,6 +31,7 @@ pip install -e .
   - `move`: move path with destination conflict policies; `retarget_symlinks` retargets in-tree absolute links after a move
   - `copy`: copy file/folder with destination conflict policies; `preserve_symlinks` keeps symlinks as links, `retarget_symlinks` rewrites in-tree absolute targets in the copy
   - `merge_folders`: one-way merge `src` into `dst` without overwriting (SHA-256 dedupe, auto-rename on conflict)
+  - `dry_run_session`: context manager sharing virtual created-directory state across a batch of dry-run `copy`/`move` calls
 - `filelib.resolver`
   - `is_same_path`: compare two paths after `Path.resolve()` normalization
 - `filelib.checker`
@@ -266,6 +267,7 @@ Notes:
 - `rename_start` (default `0`): first candidate index; use `1` for Windows-style `name_1.ext` numbering.
 - An invalid template (unknown placeholders, no placeholder varying with the index) or a negative or non-integer `rename_start` raises `ValueError` when the rename is actually attempted — also in `dry_run` mode, so previews double as feasibility checks.
 - `make_dir=True` creates missing destination parent directories.
+- In a batch of dry-run calls with `make_dir=True`, every call re-reports `Create directory <dir>` for a directory the batch would already have created; wrap the batch in `operator.dry_run_session()` to report each directory once, like the real run (see [`operator.dry_run_session`](#operatordry_run_session)).
 - `exist_policy` applies only when `dst` exists as a **file**; when `dst` is missing or an existing directory it is ignored (file/directory `src` is then placed into `dst/<basename(src)>`, or `copytree` raises `FileExistsError` for a directory `src` onto an existing directory).
 - `preserve_symlinks` (`copy` only, default `False`): symlinks are kept as links instead of followed — a symlink `src` is recreated at `dst` with its original target, and links inside a copied directory tree are recreated as links (original targets unchanged).
 - `retarget_symlinks` (`copy` and `move`, default `False`): with a real-directory `src`, links whose absolute targets lie inside `src` are rewritten to the corresponding location under `dst` after the copy/move. Relative links and links pointing outside the tree are kept verbatim. Single symlinks are never retargeted — only the link itself is copied/moved while its target stays valid where it is; retargeting is only sound when the whole tree containing both the link and its target is transported.
@@ -273,6 +275,22 @@ Notes:
   - On `move` links are preserved by `shutil.move` itself regardless of the flag; the flag only adds retargeting (fixing links that would dangle after the move).
 - Privilege pre-check: if the operation would create or rewrite at least one link, symlink-creation rights are probed **before any filesystem change**; a missing right raises `PermissionError` — in `dry_run` mode too, so previews double as feasibility checks.
 - `dry_run=True` previews each rewrite as `[RETARGET] <link>: <old> -> <new>`.
+
+### `operator.dry_run_session`
+
+- Context manager: dry-run `copy`/`move` calls inside share one virtual view of created directories.
+- Problem it solves: a dry-run call does not create directories, so in a batch of dry-run calls into the same missing parent, every call prints `Create directory <dir>` again — while the corresponding real run prints it only for the first call.
+- Inside the session a dry-run call remembers the directories it would have created — including every missing ancestor, mirroring `os.makedirs` — and later calls treat them as existing: `Create directory` is printed once per directory, and a `make_dir=False` call into a virtually created directory no longer raises `FileNotFoundError`.
+- Real runs never consult the session (the real filesystem is the truth), and only directory creation is tracked — destination *file* existence (auto-rename candidate checks included) still comes from the real filesystem.
+
+```python
+from filelib.operator import copy, dry_run_session
+
+with dry_run_session():
+    for name in files:
+        copy(name, f"out/sub/{name}", dry_run=True, make_dir=True, run_log=True)
+# "Create directory out/sub" appears once, not once per file
+```
 
 ### `operator.merge_folders`
 
