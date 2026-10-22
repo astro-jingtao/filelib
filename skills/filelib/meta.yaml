@@ -1,0 +1,5 @@
+requires:
+  - kind: cli
+    name: filelib
+    check: filelib --help
+    note: the filelib console script, installed by the filelib package this skill ships with — when missing, install the package from the repository root (pip install -e .)

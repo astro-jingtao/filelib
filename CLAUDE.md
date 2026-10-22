@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`filelib` is a small personal-reuse Python (>= 3.9) library of file-handling utilities: directory scanning, move/copy/remove, path/file/folder comparison, HTTP downloads, image corruption checks, folder merging, and deployment of AI-agent skills. Full API documentation with exact parameter semantics (`path_type`, `exist_policy`, `recursive` modes, skill name resolution) lives in README.md — extend it when changing behavior. Agent-facing behavior docs (module capability map, critical constraints, procedures, recipes) live in `doc/agent/SKILL.md` (English) and `doc/agent/SKILL_zh.md` (Chinese) — consult those for how to use filelib as an agent.
+`filelib` is a small personal-reuse Python (>= 3.9) library of file-handling utilities: directory scanning, move/copy/remove, path/file/folder comparison, HTTP downloads, image corruption checks, folder merging, and a CLI over the core operations. Full API documentation with exact parameter semantics (`path_type`, `exist_policy`, `recursive` modes) lives in README.md — extend it when changing behavior. The agent-facing usage skill (toolkit map, behavior tables, recipes) lives in `skills/filelib/skill/SKILL.md` — consult it for how to use filelib as an agent.
 
 ## Commands
 
@@ -28,11 +28,9 @@ Windows/PowerShell environment. Tests must run in the `science` conda env (the o
   - `downloader.py` — `download_response`
   - `identifier.py` — MIME detection + image completeness checks
   - `printer.py` — `Printer`, internal helper for dry-run/run-log/warning output used by `operator`
-  - `skill_deployer.py` — `deploy_skill`/`deploy_filelib`
   - `cli.py` — argparse console entry point `filelib` (`copy|move|merge|check-image`, `main(argv) -> int`) over `operator`/`identifier`; exit codes 0/1/2, run log on by default, `copy --retarget-symlinks` implies `--preserve-symlinks`
-- `__init__.py` deliberately exports only a subset (`deploy_skill`, `deploy_filelib`, `is_same_file`, `is_same_folder`); consumers import other functions from submodules.
-- `skill_deployer` deploys the built-in skill folder `doc/agent/` (`SKILL.md` + `SKILL_zh.md`) to Copilot (`<root>/.github/skills` or `~/.copilot/skills`) and/or Claude (`<root>/.claude/skills` or `~/.claude/skills`). `_get_filelib_skill_dir()` locates the repo root via `Path(__file__).parents[2]`, which assumes the src layout — keep this in mind when refactoring.
-- Windows specifics: symlink creation needs admin/Developer Mode. Tests skip or tolerate this (`tests/test_scanner.py::_prepare_symlink_tree`, `tests/test_skill_deployer.py::test_project_symlink`).
+- `__init__.py` deliberately exports only a subset (`is_same_file`, `is_same_folder`); consumers import other functions from submodules.
+- Windows specifics: symlink creation needs admin/Developer Mode. Tests skip or tolerate this (`tests/test_scanner.py::_prepare_symlink_tree`).
 - Known gaps (also tracked in README "Current Limitations"): `download_response` does not create parent directories; `operator.copy` has an unresolved recursion TODO.
 
 ## Conventions
@@ -41,6 +39,6 @@ These come from `.github/copilot-instructions.md` and apply to Claude Code as we
 
 - Prefer filelib APIs over stdlib inside package code: `scanner.ls()` over `os.walk()`/`rglob()`, `resolver.is_same_path()` over `Path.resolve()`, `operator` functions over raw `os`/`shutil` mutations. (`checker.is_same_folder` follows this by building on `scanner.ls`.)
 - Absolute imports only (`from filelib.scanner import ls`), never relative imports.
-- "更新文档" (update the docs) means updating all three of: `README.md`, `doc/agent/SKILL.md`, `doc/agent/SKILL_zh.md`.
+- "更新文档" (update the docs) means updating both of: `README.md`, `skills/filelib/skill/SKILL.md`.
 - Tests are pytest class-based and mirror modules (`test_scanner.py`, `test_operator.py`, ...); always use `tmp_path` for test files. Comments/docstrings mix English and Chinese — match the style of the file being edited.
-- `TODO/` holds pending design notes (e.g., a planned `filelib-deploy-skill` CLI for `deploy_filelib`).
+- `TODO/` holds pending design notes (e.g. `CLI.md`, `checker.md`).

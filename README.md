@@ -46,9 +46,6 @@ pip install -e .
   - `main`: console entry point `filelib` with `copy` / `move` / `merge` / `check-image` subcommands mirroring `operator` and `identifier` (see [Command Line Interface](#command-line-interface))
 - `filelib.printer`
   - internal helper used for `dry_run`, run logs, and warning messages
-- `filelib.skill_deployer`
-  - `deploy_skill`: deploy a skill folder to Copilot and/or Claude locations
-  - `deploy_filelib`: deploy filelib built-in skill folder (`doc/agent`)
 
 ## Quick Start
 
@@ -140,51 +137,7 @@ result = is_file_corrupted(
 print(result)  # True: corrupted, False: complete, None: unsupported mime (with policy=return)
 ```
 
-### 6) Deploy a skill to Copilot/Claude
-
-```python
-from filelib.skill_deployer import deploy_filelib, deploy_skill
-
-# Deploy to current project's Copilot + Claude skill folders
-paths = deploy_skill(
-  skill_dir="doc/agent",
-  destination="project",
-  assistant="both",
-  language="en",
-  skill_name="filelib-agent",
-  project_root=".",
-  overwrite=True,
-)
-print(paths)
-
-# Deploy to user home for Copilot only
-deploy_skill(
-  skill_dir="doc/agent",
-  destination="home",
-  assistant="copilot",
-  language="zh",
-  overwrite=False,
-)
-
-# Deploy filelib's built-in skill folder directly
-deploy_filelib(
-  destination="project",
-  assistant="both",
-  language="zh",
-  project_root=".",
-  overwrite=True,
-)
-
-# Override the deployed folder name under .../skills
-deploy_filelib(
-  destination="project",
-  assistant="copilot",
-  skill_name="my-filelib-skill",
-  project_root=".",
-)
-```
-
-### 7) Merge two folders without overwriting
+### 6) Merge two folders without overwriting
 
 ```python
 from filelib.operator import merge_folders
@@ -202,7 +155,7 @@ stats = merge_folders(src="backup/photos", dst="library/photos",
                       rename_format="{stem} ({i}){suffix}", rename_start=1)
 ```
 
-### 8) Copy/move a folder while preserving symbolic links
+### 7) Copy/move a folder while preserving symbolic links
 
 ```python
 from filelib.operator import copy, move
@@ -345,30 +298,6 @@ Notes:
 - MIME source can be:
   - `magic` (content-based)
   - `extension` (suffix-based)
-
-### `skill_deployer.deploy_skill`
-
-- `destination`:
-  - `project` -> `<project_root>/.github/skills` (copilot), `<project_root>/.claude/skills` (claude)
-  - `home` -> `~/.copilot/skills` (copilot), `~/.claude/skills` (claude)
-- `assistant`: `copilot`, `claude`, or `both`
-- `language`: `default|en|zh|<custom>`
-  - `default/en` -> source `SKILL.md`
-  - `zh` -> source `SKILL_zh.md`
-  - `<custom>` -> source `SKILL_<custom>.md`
-  - deployed file is always target `SKILL.md`
-- `skill_name`: target skill directory name under `.../skills`
-  - if provided, it is authoritative and deployed `SKILL.md` front matter `name` will be aligned to it
-  - if not provided, use `name:` from selected `SKILL*.md` front matter
-  - if `name:` is missing and `skill_name` is not provided, deployment raises `ValueError`
-- `overwrite=True` replaces existing deployed folder
-- `use_symlink=True` creates a symbolic link for target `SKILL.md`
-- Deployment follows skill spec layout: `<skills_root>/<skill_name>/SKILL.md`
-
-### `skill_deployer.deploy_filelib`
-
-- Uses filelib built-in skill folder: `doc/agent`
-- Name resolution follows `deploy_skill` rules above.
 
 ## Testing
 
