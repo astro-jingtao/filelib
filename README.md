@@ -230,7 +230,7 @@ Notes:
 
 ### `scanner.ls`
 
-- `path_type` supports:
+- `path_type` supports (default `abs_full_path`):
   - `file_only`
   - `raw_full_path`
   - `abs_full_path`
@@ -306,6 +306,11 @@ with dry_run_session():
 - `dry_run=True` still hashes conflicting files, so the returned statistics are accurate for the preview.
 - Returns `{"copied": n, "skipped": n, "renamed": n}`.
 - Raises `FileNotFoundError` if `src`/`dst` is missing; `ValueError` if a path is not a directory, or `src` and `dst` are the same folder, or `dst` is nested inside `src`.
+
+### `checker.is_same_file` / `checker.is_same_folder`
+
+- `is_same_file`: `mode='hash'` (SHA-256, default) or `'full'` (byte-by-byte); raises `FileNotFoundError` for a missing file and `ValueError` for an invalid mode.
+- `is_same_folder`: recursive, files matched by relative path; `file_selector_func` filters which files count, `file_compare_mode` picks the underlying `is_same_file` mode, `compare_func` overrides the per-file comparison entirely, `report=True` prints the differences. Two folders whose (selected) file sets are both empty are identical.
 
 ### `identifier.is_file_corrupted`
 

@@ -3,7 +3,17 @@ import requests
 
 
 def download_response(url, filename, force=False, verbose=False, timeout=None):
+    """Download ``url`` to ``filename`` with requests (streaming).
 
+    Behavior:
+    - An existing ``filename`` with ``force=False`` (default) skips the
+      download, prints a note when ``verbose=True``, and returns ``None``.
+    - Otherwise the HTTP status code is returned: 200 means the file was
+      written; any other status is returned, not raised.
+    - Parent directories of ``filename`` are not created; a missing
+      parent raises ``FileNotFoundError`` from ``open``.
+    - ``timeout`` is passed to requests verbatim (None = no timeout).
+    """
     if not force:
         if os.path.exists(filename):
             if verbose:

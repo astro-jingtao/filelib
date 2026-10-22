@@ -9,7 +9,7 @@ from image_complete.gif import is_gif_complete
 from image_complete.bmp import is_bmp_complete
 from image_complete.webp import is_webp_complete
 
-MINE_COMPLETE_CHECKER_MAP = {
+MIME_COMPLETE_CHECKER_MAP = {
     'image/jpeg': is_jpg_complete,
     'image/png': is_png_complete,
     'image/gif': is_gif_complete,
@@ -17,7 +17,7 @@ MINE_COMPLETE_CHECKER_MAP = {
     'image/webp': is_webp_complete
 }
 
-MINE_EXTENSION_MAP = {
+MIME_EXTENSION_MAP = {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.png': 'image/png',
@@ -33,7 +33,7 @@ def get_mime_magic(file_path: Path | str) -> str:
 
 def get_mime_extension(file_path: Path | str) -> str:
     ext = Path(file_path).suffix.lower()
-    return MINE_EXTENSION_MAP.get(ext, 'UNKNOWN')
+    return MIME_EXTENSION_MAP.get(ext, 'UNKNOWN')
 
 
 def is_file_corrupted(file_path: Path | str,
@@ -54,7 +54,7 @@ def is_file_corrupted(file_path: Path | str,
         else:
             raise ValueError(f'Invalid mime_method: {mime_method}')
 
-    checker = MINE_COMPLETE_CHECKER_MAP.get(mime)
+    checker = MIME_COMPLETE_CHECKER_MAP.get(mime)
     if checker is None:
         if unsupported_policy == 'return':
             return unsupported_return

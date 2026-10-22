@@ -106,6 +106,9 @@ def is_same_folder(folder1: str | Path,
         Custom file comparison function with signature ``compare_func(file1, file2)``.
         If provided, it takes precedence over ``file_compare_mode`` and
         ``is_same_file``.
+    report : bool, optional
+        If True, print the differences found (missing files, differing
+        files) before returning False. Defaults to False.
 
     Returns
     -------
