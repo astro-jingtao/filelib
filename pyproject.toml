@@ -6,9 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "filelib"
 version = "0.0.1"
 description = "A utility library of file-handling functions reused across my projects."
+license = { text = "GPL-3.0-only" }
 requires-python = ">=3.9"
 authors = [
     { name = "Tao Jing", email = "tao.jing.astro@gmail.com" },
+]
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
 
 dependencies = [
@@ -23,6 +27,7 @@ filelib = "filelib.cli:main"
 [tool.setuptools]
 package-dir = { "" = "src" }
 packages = { find = { where = ["src"] } }
+license-files = ["LICENSE"]
 
 [tool.setuptools.package-data]
 # the skills tree ships with the distribution — an installed package whose

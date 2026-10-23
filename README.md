@@ -345,3 +345,7 @@ Network-bound downloader checks live in `tests/test_downloader_live.py` and are 
 - With `preserve_symlinks=True` and `exist_policy="default"`, copying a single symlink onto an existing file raises `FileExistsError` instead of silently overwriting (plain `copy2` would overwrite).
 - Absolute links pointing outside the source tree are kept verbatim by the symlink flags and may dangle after a move.
 - An existing destination that is a symlink is not handled by `exist_policy` (it only distinguishes file vs directory).
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 only (GPL-3.0-only); see [LICENSE](LICENSE) for the full text.
