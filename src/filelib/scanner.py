@@ -1,5 +1,5 @@
-import warnings
 import os
+import warnings
 
 
 def ls(directory=".",
@@ -105,9 +105,8 @@ def ls(directory=".",
             )
             if on_duplicates == "raise":
                 raise ValueError(msg)
-            else:
-                # 只剩 'warn'（非法值已在入口拒绝）
-                warnings.warn(msg, UserWarning)
+            # 只剩 'warn'（非法值已在入口拒绝）
+            warnings.warn(msg, UserWarning)
 
     return sorted(result)
 

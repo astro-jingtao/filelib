@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import puremagic
+from image_complete.bmp import is_bmp_complete
+from image_complete.gif import is_gif_complete
 from image_complete.jpg import is_jpg_complete
 from image_complete.png import is_png_complete
-from image_complete.gif import is_gif_complete
-from image_complete.bmp import is_bmp_complete
 from image_complete.webp import is_webp_complete
+import puremagic
 
 MIME_COMPLETE_CHECKER_MAP = {
     'image/jpeg': is_jpg_complete,
@@ -58,10 +58,9 @@ def is_file_corrupted(file_path: Path | str,
     if checker is None:
         if unsupported_policy == 'return':
             return unsupported_return
-        elif unsupported_policy == 'raise':
+        if unsupported_policy == 'raise':
             raise ValueError(f'Unsupported MIME type: {mime}')
-        else:
-            raise ValueError(
-                f'Invalid unsupported_policy: {unsupported_policy}')
+        raise ValueError(
+            f'Invalid unsupported_policy: {unsupported_policy}')
 
     return not checker(file_path)

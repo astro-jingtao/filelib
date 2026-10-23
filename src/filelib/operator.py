@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import contextvars
 import os
+from pathlib import Path
 import shutil
 import tempfile
-from contextlib import contextmanager
-from pathlib import Path
 
 from filelib.checker import is_same_file
 from filelib.printer import Printer
@@ -709,14 +709,13 @@ def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer,
             os.remove(dst)
         printer.print_general_run_log(f"Removed existing file: {dst}")
         return dst
-    elif exist_policy == 'rename':
+    if exist_policy == 'rename':
         dst_new = get_unique_new_dst(dst, MAX_TRY,
                                      rename_format=rename_format,
                                      rename_start=rename_start)
         return dst_new
-    else:
-        raise ValueError(
-            "exist_policy must be 'default', 'overwrite' or 'rename'")
+    raise ValueError(
+        "exist_policy must be 'default', 'overwrite' or 'rename'")
 
 
 def get_unique_new_dst(dst, MAX_TRY,

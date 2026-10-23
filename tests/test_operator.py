@@ -1,13 +1,13 @@
 # pylint: disable=attribute-defined-outside-init
 
 import os
-import shutil
 from pathlib import Path
+import shutil
 
 import pytest
+
 import filelib.operator as operator_module
-from filelib.operator import (copy, dry_run_session, get_unique_new_dst,
-                              merge_folders, move, remove)
+from filelib.operator import copy, dry_run_session, get_unique_new_dst, merge_folders, move, remove
 
 
 class TestRemove:

@@ -3,6 +3,7 @@ Tests for the checker module.
 """
 
 from pathlib import Path
+
 import pytest
 
 from filelib.checker import is_same_file, is_same_folder

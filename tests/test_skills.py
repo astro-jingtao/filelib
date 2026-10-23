@@ -1,7 +1,7 @@
 """Tests for the skills tree shipped as package data under filelib.skills."""
 
-import runpy
 from pathlib import Path
+import runpy
 
 import filelib.skills as skills_pkg
 

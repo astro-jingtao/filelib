@@ -13,8 +13,8 @@ check-image), 2 usage error (argparse).
 from __future__ import annotations
 
 import argparse
-import sys
 from importlib.metadata import PackageNotFoundError, version
+import sys
 
 import puremagic
 
