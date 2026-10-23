@@ -41,4 +41,4 @@ These come from `.github/copilot-instructions.md` and apply to Claude Code as we
 - Absolute imports only (`from filelib.scanner import ls`), never relative imports.
 - "更新文档" (update the docs) means updating both of: `README.md`, `src/filelib/skills/filelib/skill/SKILL.md`.
 - Tests are pytest class-based and mirror modules (`test_scanner.py`, `test_operator.py`, ...); always use `tmp_path` for test files. Comments/docstrings mix English and Chinese — match the style of the file being edited.
-- `TODO/` holds pending design notes (e.g. `CLI.md`, `checker.md`).
+- `TODO/` holds pending design notes (untracked local area; its `.gitignore` ignores everything).
