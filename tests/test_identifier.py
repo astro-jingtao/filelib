@@ -27,7 +27,7 @@ class TestIsFileCorrupted:
         self.truncated_png = _write_png(tmp_path / "truncated.png", complete=False)
         self.notes_txt = tmp_path / "notes.txt"
         self.notes_txt.write_text("hello")
-        yield
+        return
 
     def test_complete_png_str_path_not_corrupted(self):
         """完整 PNG（str 路径）：not corrupted"""

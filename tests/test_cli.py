@@ -59,7 +59,7 @@ class TestCliCopy:
         self.src_folder = self.src_dir / "folder"
         self.src_folder.mkdir()
         (self.src_folder / "inner.txt").write_text("inner")
-        yield
+        return
 
     def test_copy_file_success_returns_0(self, capsys):
         """复制文件：返回 0，内容一致，run-log 默认输出 Copied 行"""
@@ -218,7 +218,7 @@ class TestCliCopySymlinks:
         _make_link_or_skip(self.src_dir / "link_rel", "real.txt")
 
         self.dst = self.root / "dst"
-        yield
+        return
 
     def test_retarget_implies_preserve(self, capsys):
         """只给 --retarget-symlinks：隐含 --preserve-symlinks，
@@ -273,7 +273,7 @@ class TestCliMove:
         self.dst_dir.mkdir()
         self.src_file = self.src_dir / "data.txt"
         self.src_file.write_text("source content")
-        yield
+        return
 
     def test_move_file_success(self, capsys):
         """移动文件：源消失、目标出现，run-log 默认输出 Moved 行"""
@@ -373,7 +373,7 @@ class TestCliMerge:
         # empty_dir: must not be created in dst; extra.txt: only in dst
         (self.src / "empty_dir").mkdir()
         (self.dst / "extra.txt").write_text("target only")
-        yield
+        return
 
     def test_merge_success_prints_summary(self, capsys):
         """合并成功：返回 0，打印精确的 Summary 行"""
@@ -444,7 +444,7 @@ class TestCliCheckImage:
                                         complete=False)
         self.notes_txt = tmp_path / "notes.txt"
         self.notes_txt.write_text("hello")
-        yield
+        return
 
     def test_complete_png_ok_returns_0(self, capsys):
         """完整 PNG：输出 ok，返回 0"""

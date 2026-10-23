@@ -37,7 +37,7 @@ def server_base():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield "http://127.0.0.1:%d" % server.server_address[1]
+        yield f"http://127.0.0.1:{server.server_address[1]}"
     finally:
         server.shutdown()
         thread.join()

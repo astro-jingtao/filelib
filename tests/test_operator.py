@@ -38,7 +38,7 @@ class TestRemove:
         (self.non_empty_dir_path /
          "inner_file.txt").write_text("inner content")
 
-        yield
+        return
 
     # ===== 测试用例 =====
 
@@ -62,18 +62,16 @@ class TestRemove:
 
     def test_remove_non_empty_dir_recursive_false_raises_error(self):
         """测试非空文件夹：recursive=False (默认)，抛出 OSError"""
-        with pytest.raises(OSError) as excinfo:
+        with pytest.raises(OSError, match="Directory not empty"):
             remove(str(self.non_empty_dir_path), recursive=False)
 
-        assert "Directory not empty" in str(excinfo.value)
         # 确保文件没有被删除
         assert self.non_empty_dir_path.exists()
 
         # 应该是默认行为
-        with pytest.raises(OSError) as excinfo:
+        with pytest.raises(OSError, match="Directory not empty"):
             remove(str(self.non_empty_dir_path))
 
-        assert "Directory not empty" in str(excinfo.value)
         # 确保文件没有被删除
         assert self.non_empty_dir_path.exists()
 
@@ -81,7 +79,7 @@ class TestRemove:
         """测试非空文件夹：recursive='skip'，跳过删除并打印日志"""
         remove(str(self.non_empty_dir_path), recursive='skip')
 
-        captured = capsys.readouterr()
+        capsys.readouterr()
         # 当前实现在非 dry_run 时没有打印跳过日志，所以这里主要验证文件还在
         # 如果你的实现里加了这个打印，可以取消下面注释
         # assert "Skip non-empty directory" in captured.out
@@ -195,7 +193,7 @@ class TestMove:
         self.src_file = self.src_dir / "source.txt"
         self.src_file.write_text("source content")
 
-        yield
+        return
 
     def test_move_to_file_path_success(self):
         """默认移动到目标文件路径：成功移动"""
@@ -344,10 +342,9 @@ class TestMove:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError, match="exist_policy must be"):
             move(str(self.src_file), str(dst_file), exist_policy='invalid')
 
-        assert "exist_policy must be" in str(excinfo.value)
         assert self.src_file.exists()
 
     def test_move_exist_policy_rename_custom_format(self):
@@ -476,7 +473,7 @@ class TestCopy:
         self.src_folder.mkdir()
         (self.src_folder / "inner.txt").write_text("inner content")
 
-        yield
+        return
 
     def test_copy_to_file_path_success(self):
         """默认复制到目标文件路径：成功复制"""
@@ -581,10 +578,9 @@ class TestCopy:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError, match="exist_policy must be"):
             copy(str(self.src_file), str(dst_file), exist_policy='invalid')
 
-        assert "exist_policy must be" in str(excinfo.value)
         assert self.src_file.exists()
 
     def test_copy_exist_policy_rename_custom_format_and_start(self):
@@ -894,7 +890,7 @@ class TestCopySymlinks:
 
         self.dst = self.root / "dst"
 
-        yield
+        return
 
     def test_default_follows_symlinks(self, capsys):
         """Default off: symlinks are dereferenced and copied as content."""
@@ -1156,7 +1152,7 @@ class TestMoveSymlinks:
         self.link_rel = self.src_dir / "link_rel"
         _make_link_or_skip(self.link_rel, "real.txt")
 
-        yield
+        return
 
     def test_preserve_retargets_in_tree_links_after_move(self):
         """Core feature: a same-drive move leaves in-tree absolute links
@@ -1299,7 +1295,7 @@ class TestSymlinkPrivilegePrecheck:
         self.dst = self.root / "dst"
 
     @staticmethod
-    def _raise_perm():
+    def _raise_perm() -> None:
         raise PermissionError("no privilege")
 
     def test_copy_precheck_raises_before_mutation(self, monkeypatch):
@@ -1798,7 +1794,7 @@ class TestDryRunSession:
         self.src = tmp_path / "src.txt"
         self.src.write_text("content")
         self.base = tmp_path / "base"
-        yield
+        return
 
     def _dry_copy(self, dst, **kwargs):
         copy(str(self.src), str(dst), dry_run=True, run_log=True, **kwargs)
