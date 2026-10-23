@@ -243,6 +243,7 @@ Notes:
   - `raise`
   - `warn`
   - `ignore`
+- Any other `on_duplicates` value raises `ValueError` before scanning starts.
 
 ### `scanner.is_empty_dir`
 

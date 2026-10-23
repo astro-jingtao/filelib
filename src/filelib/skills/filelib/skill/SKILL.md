@@ -63,7 +63,7 @@ After executing, confirm the outcome (`ls()`, `Path.exists()`, or the statistics
 - Returns a **sorted** list; `match_func` receives the file **name**, not its path.
 - `recursive=False` (default) lists only the top directory's files.
 - `path_type` picks the returned format: `abs_full_path` (the actual default), `rel_path`, `raw_full_path`, `file_only`.
-- `file_only` can collide across subdirectories → `on_duplicates` `raise` / `warn` / `ignore`.
+- `file_only` can collide across subdirectories → `on_duplicates` `raise` / `warn` / `ignore`; any other value raises `ValueError` up front.
 - `follow_symlinks=True` (default) matters only when recursing into symlinked directories.
 
 ## Empty directories — `scanner.is_empty_dir`

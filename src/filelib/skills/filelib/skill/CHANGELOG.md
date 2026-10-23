@@ -2,6 +2,11 @@
 
 Notable changes, newest first.
 
+## 2026-10-23
+
+### Changed
+- `scanner.ls` now rejects an invalid `on_duplicates` value with `ValueError` up front (previously silent in most cases); scanning behavior note updated.
+
 ## 2026-10-22
 
 ### Changed

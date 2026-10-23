@@ -57,6 +57,48 @@ class TestLs:
         assert normalized == ["real/sub/data.txt"]
 
 
+class TestLsOnDuplicates:
+    """on_duplicates 三个合法取值的行为与非法值的入口校验。"""
+
+    @pytest.fixture(autouse=True)
+    def setup_tmpdir(self, tmp_path: Path) -> None:
+        # 两个子目录各有一个同名文件：file_only 模式下产生重复名
+        self.root = tmp_path / "dup_root"
+        (self.root / "sub1").mkdir(parents=True)
+        (self.root / "sub2").mkdir(parents=True)
+        (self.root / "sub1" / "data.txt").write_text("a")
+        (self.root / "sub2" / "data.txt").write_text("b")
+
+    def test_raise_mode_raises_on_duplicate_names(self) -> None:
+        with pytest.raises(ValueError, match="Duplicate file names"):
+            ls(str(self.root), recursive=True, path_type="file_only")
+
+    def test_warn_mode_warns_and_returns_result(self) -> None:
+        with pytest.warns(UserWarning, match="Duplicate file names"):
+            result = ls(str(self.root), recursive=True,
+                        path_type="file_only", on_duplicates="warn")
+        assert result == ["data.txt", "data.txt"]
+
+    def test_ignore_mode_returns_duplicates(self) -> None:
+        result = ls(str(self.root), recursive=True,
+                    path_type="file_only", on_duplicates="ignore")
+        assert result == ["data.txt", "data.txt"]
+
+    def test_invalid_on_duplicates_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="on_duplicates"):
+            ls(str(self.root), recursive=True, on_duplicates="bogus")
+
+    def test_invalid_on_duplicates_rejected_without_duplicates(self) -> None:
+        # 非法值在入口即拒绝：即使不产生重复名、非 file_only 模式也可见
+        with pytest.raises(ValueError, match="on_duplicates"):
+            ls(str(self.root), path_type="abs_full_path", on_duplicates="")
+
+    def test_invalid_path_type_raises_value_error(self) -> None:
+        # path_type 的校验是惰性的：在遍历中遇到第一个文件时才抛出
+        with pytest.raises(ValueError, match="path_type"):
+            ls(str(self.root), recursive=True, path_type="bogus")
+
+
 class TestIsEmptyDir:
 
     @pytest.fixture(autouse=True)

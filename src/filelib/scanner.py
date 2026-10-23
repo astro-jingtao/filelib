@@ -32,6 +32,7 @@ def ls(directory=".",
         * 'raise': Raises a ValueError.
         * 'warn': Warns the user with a UserWarning.
         * 'ignore': Ignores the duplicates.
+        Any other value raises a ValueError before scanning starts.
     follow_symlinks : bool, optional
         If True, recursive directory traversal follows symbolic links to
         directories. If False, symlinked directories are not traversed.
@@ -42,11 +43,27 @@ def ls(directory=".",
     list of str
         A sorted list of file names or paths that match the criteria.
 
+    Raises
+    ------
+    ValueError
+        If ``on_duplicates`` is not one of 'raise', 'warn', 'ignore'
+        (checked before scanning starts); if ``path_type`` is invalid
+        (raised when the first file is reached); or if duplicate file
+        names are found in 'file_only' mode with ``on_duplicates='raise'``.
+
     Examples
     --------
     >>> ls(match_func=lambda f: f.endswith(('.jpg', '.gif')), recursive=True)
     ['/path/to/img1.jpg', '/path/to/subdir/img2.gif']
     """
+
+    # 非法枚举值在扫描开始前即拒绝：与包内其他参数校验（ValueError）一致，
+    # 且不依赖"是否恰好存在重复名"才暴露。
+    if on_duplicates not in ("raise", "warn", "ignore"):
+        raise ValueError(
+            f"Invalid on_duplicates: {on_duplicates}. "
+            "Choose from 'raise', 'warn', or 'ignore'."
+        )
 
     result = []
 
@@ -88,12 +105,9 @@ def ls(directory=".",
             )
             if on_duplicates == "raise":
                 raise ValueError(msg)
-            elif on_duplicates == "warn":
-                warnings.warn(msg, UserWarning)
             else:
-                raise NotImplementedError(
-                    "on_duplicates option must be one of 'raise', 'warn', or 'ignore'."
-                )
+                # 只剩 'warn'（非法值已在入口拒绝）
+                warnings.warn(msg, UserWarning)
 
     return sorted(result)
 
