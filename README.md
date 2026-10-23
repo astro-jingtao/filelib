@@ -335,6 +335,8 @@ Run tests with:
 pytest -q
 ```
 
+Network-bound downloader checks live in `tests/test_downloader_live.py` and are skipped by default; set `FILELIB_LIVE_TESTS=1` to run them against a real remote endpoint.
+
 ## Current Limitations
 
 - `download_response` does not create parent directories automatically.
