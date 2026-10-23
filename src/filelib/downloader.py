@@ -1,9 +1,14 @@
+"""HTTP downloads over requests, streaming to disk."""
+from __future__ import annotations
+
 import os
 
 import requests
 
 
-def download_response(url, filename, force=False, verbose=False, timeout=None):
+def download_response(url: str, filename: str, force: bool = False,
+                      verbose: bool = False,
+                      timeout: float | None = None) -> int | None:
     """Download ``url`` to ``filename`` with requests (streaming).
 
     Behavior:
@@ -15,11 +20,10 @@ def download_response(url, filename, force=False, verbose=False, timeout=None):
       parent raises ``FileNotFoundError`` from ``open``.
     - ``timeout`` is passed to requests verbatim (None = no timeout).
     """
-    if not force:
-        if os.path.exists(filename):
-            if verbose:
-                print(f"File {filename} already exists. Skipping download.")
-            return None
+    if not force and os.path.exists(filename):
+        if verbose:
+            print(f"File {filename} already exists. Skipping download.")
+        return None
 
     response = requests.get(url, stream=True, timeout=timeout)
     if response.status_code == 200:

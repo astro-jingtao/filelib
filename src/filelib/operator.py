@@ -1,5 +1,8 @@
+"""File operations (remove/move/copy/merge) with dry-run, run-log, and
+conflict policies, including symlink preservation and retargeting."""
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 import contextvars
 import os
@@ -20,7 +23,7 @@ _dry_run_created_dirs = contextvars.ContextVar('filelib_dry_run_created_dirs',
 
 
 @contextmanager
-def dry_run_session():
+def dry_run_session() -> Iterator[None]:
     """Share one virtual directory state across dry-run calls.
 
     A dry-run ``copy``/``move`` does not create directories, so in a
@@ -52,7 +55,8 @@ def dry_run_session():
         _dry_run_created_dirs.reset(token)
 
 
-def remove(path, recursive=False, dry_run=False, run_log=False):
+def remove(path: str, recursive: bool | str = False, dry_run: bool = False,
+           run_log: bool = False) -> None:
     """
     删除文件或目录。
 
@@ -106,16 +110,17 @@ def remove(path, recursive=False, dry_run=False, run_log=False):
         printer.print_general_run_log(f"Removed file: {path}")
 
 
-def move(src,
-         dst,
-         copy_function=None,
-         dry_run=False,
-         exist_policy='default',
-         make_dir=False,
-         run_log=False,
-         retarget_symlinks=False,
-         rename_format='{stem}_{i}{suffix}',
-         rename_start=0):
+def move(src: str | Path,
+         dst: str | Path,
+         *,
+         copy_function: Callable | None = None,
+         dry_run: bool = False,
+         exist_policy: str = 'default',
+         make_dir: bool = False,
+         run_log: bool = False,
+         retarget_symlinks: bool = False,
+         rename_format: str = '{stem}_{i}{suffix}',
+         rename_start: int = 0) -> None:
     """Move a file or directory from ``src`` to ``dst``.
 
     Wraps ``shutil.move``: same-drive moves rename, cross-drive moves
@@ -178,10 +183,13 @@ def move(src,
     ------
     ValueError
         If ``exist_policy`` is not one of ``'default'``, ``'overwrite'``,
-        ``'rename'``, or if ``rename_format`` / ``rename_start`` are
-        invalid — the latter is checked only when a rename is actually
-        attempted (``exist_policy='rename'`` and ``dst`` exists as a
-        file), also in ``dry_run`` mode.
+        ``'rename'``, or if ``rename_format`` / ``rename_start`` have
+        invalid values — the latter is checked only when a rename is
+        actually attempted (``exist_policy='rename'`` and ``dst`` exists
+        as a file), also in ``dry_run`` mode.
+    TypeError
+        If ``rename_format`` is not a ``str`` or ``rename_start`` is not
+        an ``int`` — checked together with the value checks above.
     FileNotFoundError
         If the parent folder of ``dst`` does not exist and
         ``make_dir`` is False.
@@ -284,17 +292,18 @@ def move(src,
     printer.print_general_run_log(f"Moved {src} to {dst}")
 
 
-def copy(src,
-         dst,
-         copy_function=None,
-         dry_run=False,
-         exist_policy='default',
-         make_dir=False,
-         run_log=False,
-         preserve_symlinks=False,
-         retarget_symlinks=False,
-         rename_format='{stem}_{i}{suffix}',
-         rename_start=0):
+def copy(src: str | Path,
+         dst: str | Path,
+         *,
+         copy_function: Callable | None = None,
+         dry_run: bool = False,
+         exist_policy: str = 'default',
+         make_dir: bool = False,
+         run_log: bool = False,
+         preserve_symlinks: bool = False,
+         retarget_symlinks: bool = False,
+         rename_format: str = '{stem}_{i}{suffix}',
+         rename_start: int = 0) -> None:
     """Copy a file or directory from ``src`` to ``dst``.
 
     Files are copied with ``shutil.copy2`` (metadata included) and
@@ -361,10 +370,13 @@ def copy(src,
     ------
     ValueError
         If ``exist_policy`` is not one of ``'default'``, ``'overwrite'``,
-        ``'rename'``, or if ``rename_format`` / ``rename_start`` are
-        invalid — the latter is checked only when a rename is actually
-        attempted (``exist_policy='rename'`` and ``dst`` exists as a
-        file), also in ``dry_run`` mode.
+        ``'rename'``, or if ``rename_format`` / ``rename_start`` have
+        invalid values — the latter is checked only when a rename is
+        actually attempted (``exist_policy='rename'`` and ``dst`` exists
+        as a file), also in ``dry_run`` mode.
+    TypeError
+        If ``rename_format`` is not a ``str`` or ``rename_start`` is not
+        an ``int`` — checked together with the value checks above.
     FileNotFoundError
         If the parent folder of ``dst`` does not exist and
         ``make_dir`` is False.
@@ -511,6 +523,7 @@ def copy(src,
 
 def merge_folders(src: str | Path,
                   dst: str | Path,
+                  *,
                   dry_run: bool = False,
                   run_log: bool = False,
                   rename_format: str = '{stem}_{i}{suffix}',
@@ -566,8 +579,11 @@ def merge_folders(src: str | Path,
     ValueError
         If ``src`` or ``dst`` is not a directory, or if they are the same
         folder, or if ``dst`` is nested inside ``src``, or if
-        ``rename_format`` / ``rename_start`` are invalid (checked before
-        any file is copied).
+        ``rename_format`` / ``rename_start`` have invalid values (checked
+        before any file is copied).
+    TypeError
+        If ``rename_format`` is not a ``str`` or ``rename_start`` is not
+        an ``int`` (checked together with the value checks).
     """
     MAX_TRY = 10000  # max tries to find a free rename suffix
 
@@ -619,7 +635,8 @@ def merge_folders(src: str | Path,
     return {"copied": copied, "skipped": skipped, "renamed": renamed}
 
 
-def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
+def _check_dst_parent_folder_exist(dst: str, make_dir: bool, dry_run: bool,
+                                   printer: Printer) -> None:
     """ check if the parent folder of dst exist, if not, create it or raise error
 
     Parameters
@@ -628,6 +645,12 @@ def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
         destination path
     make_dir : bool
         if True, create the parent folder of dst if not exist, otherwise raise error
+    dry_run : bool
+        if True, only print the creation without touching the filesystem
+        (directories virtually created earlier in the active dry-run
+        session count as existing)
+    printer : Printer
+        printer object for logging
     """
 
     # a bare file name has no dirname ('' does not exist); its parent is the cwd
@@ -648,13 +671,13 @@ def _check_dst_parent_folder_exist(dst, make_dir, dry_run, printer: Printer):
             )
 
 
-def _normalize_dir(folder):
+def _normalize_dir(folder: str) -> str:
     """Normalize a directory path for dry-run session lookups: absolute
     and case-folded where the platform is case-insensitive."""
     return os.path.normcase(os.path.abspath(folder))
 
 
-def _dir_would_exist(folder, created_dirs):
+def _dir_would_exist(folder: str, created_dirs: set[str] | None) -> bool:
     """True if ``folder`` exists on disk, or was already virtually created
     in the active dry-run session (``created_dirs`` is None outside one)."""
     if os.path.exists(folder):
@@ -662,7 +685,7 @@ def _dir_would_exist(folder, created_dirs):
     return created_dirs is not None and _normalize_dir(folder) in created_dirs
 
 
-def _remember_dry_run_dirs(folder, created_dirs):
+def _remember_dry_run_dirs(folder: str, created_dirs: set[str] | None) -> None:
     """Record ``folder`` and all its missing ancestors as virtually created
     (mirroring what ``os.makedirs`` would create) in the dry-run session."""
     if created_dirs is None:
@@ -676,8 +699,10 @@ def _remember_dry_run_dirs(folder, created_dirs):
         probe = parent
 
 
-def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer,
-                     rename_format='{stem}_{i}{suffix}', rename_start=0):
+def _check_dst_exist(dst: str, exist_policy: str, dry_run: bool,
+                     printer: Printer, *,
+                     rename_format: str = '{stem}_{i}{suffix}',
+                     rename_start: int = 0) -> str:
     """ check if dst already exist and deal with it according to `exist_policy`
 
     Parameters
@@ -718,8 +743,9 @@ def _check_dst_exist(dst, exist_policy, dry_run, printer: Printer,
         "exist_policy must be 'default', 'overwrite' or 'rename'")
 
 
-def get_unique_new_dst(dst, MAX_TRY,
-                       rename_format='{stem}_{i}{suffix}', rename_start=0):
+def get_unique_new_dst(dst: str, MAX_TRY: int,
+                       rename_format: str = '{stem}_{i}{suffix}',
+                       rename_start: int = 0) -> str:
     """Generate a non-existing path from a rename template.
 
     Candidates are rendered from ``rename_format`` with the candidate
@@ -751,8 +777,11 @@ def get_unique_new_dst(dst, MAX_TRY,
     Raises
     ------
     ValueError
-        If ``rename_format`` / ``rename_start`` are invalid (see
+        If ``rename_format`` / ``rename_start`` have invalid values (see
         ``_validate_rename_spec``).
+    TypeError
+        If ``rename_format`` is not a ``str`` or ``rename_start`` is not
+        an ``int``.
     RuntimeError
         If no free name is found within ``MAX_TRY`` tries.
     """
@@ -775,8 +804,9 @@ def get_unique_new_dst(dst, MAX_TRY,
     )
 
 
-def _validate_rename_spec(rename_format, rename_start):
-    """Validate ``rename_format`` / ``rename_start``; raise ValueError.
+def _validate_rename_spec(rename_format: str, rename_start: int) -> None:
+    """Validate ``rename_format`` / ``rename_start``; raise TypeError for
+    wrong types and ValueError for invalid values.
 
     Renders the template twice with consecutive indices instead of
     parsing it: unknown or positional placeholders, malformed templates
@@ -785,10 +815,10 @@ def _validate_rename_spec(rename_format, rename_start):
     equality check.
     """
     if not isinstance(rename_format, str):
-        raise ValueError(
+        raise TypeError(
             f'rename_format must be a str, got {type(rename_format).__name__}')
     if isinstance(rename_start, bool) or not isinstance(rename_start, int):
-        raise ValueError(f'rename_start must be an int, got {rename_start!r}')
+        raise TypeError(f'rename_start must be an int, got {rename_start!r}')
     if rename_start < 0:
         raise ValueError(
             f'rename_start must be a non-negative int, got {rename_start}')
@@ -825,7 +855,7 @@ def _validate(src_path: Path, dst_path: Path) -> None:
             f"Destination folder must not be inside the source folder: {dst_path}")
 
 
-def _map_link_target(link_target, src_root, dst_root):
+def _map_link_target(link_target: str, src_root: str, dst_root: str) -> str:
     """Remap an absolute symlink target inside ``src_root`` to the
     corresponding location under ``dst_root``; return the target
     unchanged otherwise (relative, outside ``src_root``, or cross-drive).
@@ -866,7 +896,7 @@ def _map_link_target(link_target, src_root, dst_root):
     return link_target
 
 
-def _check_symlink_privilege():
+def _check_symlink_privilege() -> None:
     """Raise PermissionError if symlinks cannot be created here.
 
     Probes with a throwaway symlink in a temporary directory, so a
@@ -885,7 +915,7 @@ def _check_symlink_privilege():
             ) from exc
 
 
-def _iter_symlinks(walk_root):
+def _iter_symlinks(walk_root: str) -> Iterator[str]:
     """Yield the paths of all symlinks under ``walk_root``.
 
     os.walk is used directly instead of ``scanner.ls`` because ``ls()``
@@ -901,7 +931,8 @@ def _iter_symlinks(walk_root):
                 yield path
 
 
-def _iter_retargets(walk_root, src_root, dst_root):
+def _iter_retargets(walk_root: str, src_root: str,
+                    dst_root: str) -> Iterator[tuple[str, str, str]]:
     """Yield ``(path, old_target, new_target)`` for every symlink under
     ``walk_root`` whose remapped target differs from the stored one."""
     for path in _iter_symlinks(walk_root):
@@ -911,7 +942,8 @@ def _iter_retargets(walk_root, src_root, dst_root):
             yield path, old_target, new_target
 
 
-def _retarget_symlinks(src_root, dst_root, dry_run, printer: Printer):
+def _retarget_symlinks(src_root: str, dst_root: str, dry_run: bool,
+                       printer: Printer) -> None:
     """Rewrite symlinks whose absolute targets pointed inside
     ``src_root`` so they point inside ``dst_root``.
 

@@ -1775,8 +1775,8 @@ class TestGetUniqueNewDst:
                                rename_start=-1)
 
     def test_non_int_rename_start_raises(self):
-        """A non-int rename_start raises ValueError."""
-        with pytest.raises(ValueError, match="rename_start"):
+        """A non-int rename_start raises TypeError."""
+        with pytest.raises(TypeError, match="rename_start"):
             get_unique_new_dst(str(self.dir / "diff.txt"), 100,
                                rename_start='1')
 

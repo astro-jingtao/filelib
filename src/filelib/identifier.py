@@ -1,3 +1,4 @@
+"""MIME detection and image completeness checks."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,19 +29,30 @@ MIME_EXTENSION_MAP = {
 
 
 def get_mime_magic(file_path: Path | str) -> str:
+    """Detect the MIME type from file content (puremagic)."""
     return puremagic.from_file(file_path, mime=True)
 
 
 def get_mime_extension(file_path: Path | str) -> str:
+    """Map the file name suffix to a MIME type ('UNKNOWN' when unmapped)."""
     ext = Path(file_path).suffix.lower()
     return MIME_EXTENSION_MAP.get(ext, 'UNKNOWN')
 
 
 def is_file_corrupted(file_path: Path | str,
-                      mime=None,
-                      mime_method='magic',
-                      unsupported_policy='return',
-                      unsupported_return=None) -> bool | None:
+                      mime: str | None = None,
+                      mime_method: str = 'magic',
+                      unsupported_policy: str = 'return',
+                      unsupported_return: bool | None = None
+                      ) -> bool | None:
+    """Check whether an image file is corrupted (truncated/incomplete).
+
+    Returns True/False for checkable images; ``unsupported_return``
+    (default None) when the detected MIME type has no checker; raises
+    ValueError for an invalid ``mime_method``, or for an unsupported
+    MIME type with ``unsupported_policy='raise'``. See README for the
+    full parameter semantics.
+    """
     # image_complete's load() only accepts str/bytes/BytesIO; a Path makes
     # every checker return False (false "corrupted" + "Unhandled data
     # type" noise), so normalize before dispatching.

@@ -60,6 +60,7 @@ def _add_rename_flags(sub: argparse.ArgumentParser) -> None:
 
 
 def cmd_copy(args: argparse.Namespace) -> int:
+    """Run the ``copy`` subcommand (retarget implies preserve)."""
     # --retarget-symlinks implies --preserve-symlinks: the library would
     # otherwise warn and silently disable retargeting (a hidden no-op for
     # a user who explicitly asked for retargeting).
@@ -76,6 +77,7 @@ def cmd_copy(args: argparse.Namespace) -> int:
 
 
 def cmd_move(args: argparse.Namespace) -> int:
+    """Run the ``move`` subcommand."""
     move(args.src, args.dst,
          dry_run=args.dry_run,
          exist_policy=args.exist_policy,
@@ -88,6 +90,7 @@ def cmd_move(args: argparse.Namespace) -> int:
 
 
 def cmd_merge(args: argparse.Namespace) -> int:
+    """Run the ``merge`` subcommand and print the summary line."""
     stats = merge_folders(args.src, args.dst,
                           dry_run=args.dry_run,
                           run_log=args.run_log,
@@ -99,6 +102,7 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
 
 def cmd_check_image(args: argparse.Namespace) -> int:
+    """Run the ``check-image`` subcommand over the given files."""
     ok = corrupted = unsupported = errors = 0
     for path in args.files:
         try:
@@ -128,6 +132,7 @@ def cmd_check_image(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the argparse parser with all subcommands."""
     parser = argparse.ArgumentParser(
         prog='filelib',
         description='File utilities: copy/move with conflict policies and '
@@ -214,7 +219,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
+    """Parse ``argv`` (default: sys.argv) and dispatch the subcommand."""
     parser = build_parser()
     args = parser.parse_args(argv)  # usage errors exit 2 here
     try:
