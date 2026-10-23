@@ -3,9 +3,9 @@ File comparison utilities for checking if files and folders are identical.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 import hashlib
 from pathlib import Path
-from typing import Callable, Optional
 
 from filelib.scanner import ls
 
@@ -84,10 +84,11 @@ def _compare_full(file1: Path, file2: Path) -> bool:
 
 def is_same_folder(folder1: str | Path,
                    folder2: str | Path,
-                   file_selector_func: Optional[Callable[[str], bool]] = None,
+                   *,
+                   file_selector_func: Callable[[str], bool] | None = None,
                    file_compare_mode: str = 'hash',
-                   compare_func: Optional[Callable[[Path, Path], bool]] = None,
-                   report=False) -> bool:
+                   compare_func: Callable[[Path, Path], bool] | None = None,
+                   report: bool = False) -> bool:
     """
     Check if two folders contain the same files with identical content.
 
@@ -125,15 +126,8 @@ def is_same_folder(folder1: str | Path,
     folder1_path = Path(folder1)
     folder2_path = Path(folder2)
 
-    if not folder1_path.exists():
-        raise FileNotFoundError(f"Folder not found: {folder1_path}")
-    if not folder2_path.exists():
-        raise FileNotFoundError(f"Folder not found: {folder2_path}")
-
-    if not folder1_path.is_dir():
-        raise ValueError(f"Not a directory: {folder1_path}")
-    if not folder2_path.is_dir():
-        raise ValueError(f"Not a directory: {folder2_path}")
+    _validate_folder(folder1_path)
+    _validate_folder(folder2_path)
 
     # Get file lists from both folders
     files1 = _get_folder_files(folder1_path, file_selector_func)
@@ -147,34 +141,57 @@ def is_same_folder(folder1: str | Path,
             print(f"Files in {folder2_path}: {files2.keys()}")
         return False
 
-    diff_files = {}
-
-    # Compare each file
-    # pylint: disable=consider-using-dict-items
-    for filename in files1:
-        file1_path = files1[filename]
-        file2_path = files2[filename]
-        if compare_func is not None:
-            if not compare_func(file1_path, file2_path):
-                diff_files[filename] = (file1_path, file2_path)
-        else:
-            if not is_same_file(file1_path, file2_path,
-                                mode=file_compare_mode):
-                diff_files[filename] = (file1_path, file2_path)
+    diff_files = _compare_files(files1, files2, compare_func,
+                                file_compare_mode)
 
     if diff_files:
         if report:
-            for filename in diff_files:
-                file1_path, file2_path = diff_files[filename]
+            for file1_path, file2_path in diff_files.values():
                 print(f"Files {file1_path} and {file2_path} are different")
         return False
 
     return True
 
 
+def _validate_folder(folder_path: Path) -> None:
+    """Raise FileNotFoundError / ValueError unless ``folder_path`` is an
+    existing directory."""
+    if not folder_path.exists():
+        raise FileNotFoundError(f"Folder not found: {folder_path}")
+    if not folder_path.is_dir():
+        raise ValueError(f"Not a directory: {folder_path}")
+
+
+def _compare_files(
+        files1: dict[str, Path],
+        files2: dict[str, Path],
+        compare_func: Callable[[Path, Path], bool] | None,
+        file_compare_mode: str) -> dict[str, tuple[Path, Path]]:
+    """Compare the shared entries of two file lists; return the failures.
+
+    ``compare_func`` (custom comparator) takes precedence over
+    ``is_same_file`` driven by ``file_compare_mode``. The returned dict
+    maps each failing relative path to its ``(folder1, folder2)`` paths.
+    """
+    diff_files = {}
+
+    for filename, file1_path in files1.items():
+        file2_path = files2[filename]
+        if compare_func is not None:
+            same = compare_func(file1_path, file2_path)
+        else:
+            same = is_same_file(file1_path, file2_path,
+                                mode=file_compare_mode)
+        if not same:
+            diff_files[filename] = (file1_path, file2_path)
+
+    return diff_files
+
+
 def _get_folder_files(
         folder: Path,
-        file_selector_func: Optional[Callable[[str], bool]] = None) -> dict:
+        file_selector_func: Callable[[str], bool] | None = None
+        ) -> dict[str, Path]:
     """
     Get all files in a folder that match the filter function.
 
