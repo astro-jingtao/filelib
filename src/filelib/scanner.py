@@ -1,13 +1,19 @@
+"""Directory scanning utilities: file listing and emptiness checks."""
+from __future__ import annotations
+
+from collections.abc import Callable
 import os
+from os import PathLike
 import warnings
 
 
-def ls(directory=".",
-       match_func=None,
-       recursive=False,
-       path_type='abs_full_path',
-       on_duplicates="raise",
-       follow_symlinks=True):
+def ls(directory: str = ".",
+       *,
+       match_func: Callable[[str], bool] | None = None,
+       recursive: bool = False,
+       path_type: str = 'abs_full_path',
+       on_duplicates: str = "raise",
+       follow_symlinks: bool = True) -> list[str]:
     """
     List files in a directory, similar to the shell 'ls' command, with support for custom filtering and path formatting.
 
@@ -68,50 +74,58 @@ def ls(directory=".",
     result = []
 
     # os.walk yields a 3-tuple (dirpath, dirnames, filenames)
-    for root, dirs, files in os.walk(directory, followlinks=follow_symlinks):
+    for root, _dirs, files in os.walk(directory, followlinks=follow_symlinks):
         for file in files:
             # Extension filtering logic
             if match_func and not match_func(file):
                 continue
 
             # Path construction logic
-            if path_type == "abs_full_path":
-                p = os.path.abspath(os.path.join(root, file))
-            elif path_type == "raw_full_path":
-                p = os.path.join(root, file)
-            elif path_type == "rel_path":
-                # 返回相对于初始 directory 的路径
-                p = os.path.relpath(os.path.join(root, file), directory)
-            elif path_type == "file_only":
-                p = file
-            else:
-                raise ValueError(
-                    f"Invalid path_type: {path_type}. "
-                    "Choose from 'raw_full_path', 'abs_full_path', 'rel_path', 'file_only'."
-                )
-
-            result.append(p)
+            result.append(_format_entry_path(root, file, directory, path_type))
 
         # Stop after the first level if recursive is False
         if not recursive:
             break
 
     # check if same file name in result when path_type is 'file_only'
-    if (path_type == 'file_only') and (on_duplicates != 'ignore'):
-        if len(result) != len(set(result)):
-            msg = (
-                "Duplicate file names found in 'file_only' mode. "
-                "Consider using 'rel_path', 'raw_full_path', or 'abs_full_path' for unique paths."
-            )
-            if on_duplicates == "raise":
-                raise ValueError(msg)
-            # 只剩 'warn'（非法值已在入口拒绝）
-            warnings.warn(msg, UserWarning)
+    if ((path_type == 'file_only') and (on_duplicates != 'ignore')
+            and len(result) != len(set(result))):
+        msg = (
+            "Duplicate file names found in 'file_only' mode. "
+            "Consider using 'rel_path', 'raw_full_path', or 'abs_full_path' for unique paths."
+        )
+        if on_duplicates == "raise":
+            raise ValueError(msg)
+        # 只剩 'warn'（非法值已在入口拒绝）
+        warnings.warn(msg, UserWarning, stacklevel=2)
 
     return sorted(result)
 
 
-def is_empty_dir(directory, recursive=False):
+def _format_entry_path(root: str, file: str, directory: str,
+                       path_type: str) -> str:
+    """Build the output path for one file according to ``path_type``.
+
+    Raises ValueError for an unknown ``path_type`` — only when a file is
+    reached, so an empty directory never validates it (same as when the
+    logic lived inline in ``ls``).
+    """
+    if path_type == "abs_full_path":
+        return os.path.abspath(os.path.join(root, file))
+    if path_type == "raw_full_path":
+        return os.path.join(root, file)
+    if path_type == "rel_path":
+        # 返回相对于初始 directory 的路径
+        return os.path.relpath(os.path.join(root, file), directory)
+    if path_type == "file_only":
+        return file
+    raise ValueError(
+        f"Invalid path_type: {path_type}. "
+        "Choose from 'raw_full_path', 'abs_full_path', 'rel_path', 'file_only'."
+    )
+
+
+def is_empty_dir(directory: str | PathLike, recursive: bool = False) -> bool:
     """
     Check whether a directory is empty.
 
