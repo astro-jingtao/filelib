@@ -53,8 +53,8 @@ def is_same_file(file1: str | Path,
 
     if mode == 'hash':
         return _compare_by_hash(file1_path, file2_path)
-    else:  # mode == 'full'
-        return _compare_full(file1_path, file2_path)
+    # mode == 'full'
+    return _compare_full(file1_path, file2_path)
 
 
 def _compare_by_hash(file1: Path, file2: Path) -> bool:

@@ -1,5 +1,5 @@
-import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 
 import pytest
 
@@ -30,7 +30,7 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
 
-@pytest.fixture()
+@pytest.fixture
 def server_base():
     _Handler.hits = 0
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
