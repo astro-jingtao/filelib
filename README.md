@@ -268,7 +268,7 @@ Notes:
   - `rename`: auto-generate destination suffix (`_0`, `_1`, ...; pattern configurable via `rename_format`/`rename_start`)
 - `rename_format` (default `'{stem}_{i}{suffix}'`): template for the auto-renamed destination used by `exist_policy="rename"`, applied to the destination **file name** (candidates stay in the directory of `dst`). Placeholders: `{stem}` (file name without its final suffix), `{suffix}` (final suffix with its leading dot, empty for names like `README`), `{i}` (candidate index, format specs supported, e.g. `{i:03d}` for zero padding; literal braces as `{{`/`}}`).
 - `rename_start` (default `0`): first candidate index; use `1` for Windows-style `name_1.ext` numbering.
-- An invalid template (unknown placeholders, no placeholder varying with the index) or a negative or non-integer `rename_start` raises `ValueError` when the rename is actually attempted — also in `dry_run` mode, so previews double as feasibility checks.
+- An invalid template (unknown placeholders, no placeholder varying with the index) or a negative `rename_start` raises `ValueError` when the rename is actually attempted — also in `dry_run` mode, so previews double as feasibility checks; a non-`str` `rename_format` or non-`int` `rename_start` raises `TypeError` instead.
 - `make_dir=True` creates missing destination parent directories.
 - In a batch of dry-run calls with `make_dir=True`, every call re-reports `Create directory <dir>` for a directory the batch would already have created; wrap the batch in `operator.dry_run_session()` to report each directory once, like the real run (see [`operator.dry_run_session`](#operatordry_run_session)).
 - `exist_policy` applies only when `dst` exists as a **file**; when `dst` is missing or an existing directory it is ignored (file/directory `src` is then placed into `dst/<basename(src)>`, or `copytree` raises `FileExistsError` for a directory `src` onto an existing directory).
@@ -298,7 +298,7 @@ with dry_run_session():
 ### `operator.merge_folders`
 
 - Never overwrites: on name conflict the destination file is kept, and the source file is copied under an auto-renamed name.
-- Rename format defaults to `stem_0.ext`, `stem_1.ext`, ... and is configurable via `rename_format` / `rename_start` (same template semantics as `operator.move/copy` with `exist_policy="rename"`; an invalid template raises `ValueError` before any file is copied).
+- Rename format defaults to `stem_0.ext`, `stem_1.ext`, ... and is configurable via `rename_format` / `rename_start` (same template semantics as `operator.move/copy` with `exist_policy="rename"`; an invalid template raises `ValueError` and wrong argument types raise `TypeError`, both before any file is copied).
 - Files are matched by relative path:
   - destination missing -> direct copy with parent directories created
   - identical SHA-256 -> skipped

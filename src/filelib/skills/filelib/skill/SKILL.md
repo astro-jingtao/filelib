@@ -84,7 +84,7 @@ What happens depends on what `dst` is; `exist_policy` applies only to the last r
 
 - An invalid `exist_policy` string raises only when the policy actually fires (existing-file `dst`).
 - Dry-run batches: a dry-run call never creates directories, so repeated calls into the same missing parent re-print `Create directory`. Wrap the batch in `with operator.dry_run_session():` and each directory is reported once, matching the real run (missing ancestors remembered like `os.makedirs`; destination *file* existence still comes from the real filesystem, and real runs ignore the session).
-- `rename_format` (default `'{stem}_{i}{suffix}'`) renders the destination **file name**; placeholders `{stem}`, `{suffix}` (may be empty), `{i}` (format specs such as `{i:03d}` allowed). The template must vary with the index — violations raise `ValueError` when a rename fires, in `dry_run` too. `merge_folders` validates the spec up front instead.
+- `rename_format` (default `'{stem}_{i}{suffix}'`) renders the destination **file name**; placeholders `{stem}`, `{suffix}` (may be empty), `{i}` (format specs such as `{i:03d}` allowed). The template must vary with the index — value violations raise `ValueError` when a rename fires (in `dry_run` too), wrong argument types raise `TypeError`; `merge_folders` validates the spec up front instead.
 - Copying follows symlinks by default; a dangling link inside a tree raises.
 
 ## Deletion — `operator.remove`
