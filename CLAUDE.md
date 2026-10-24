@@ -15,7 +15,7 @@ Windows/PowerShell environment. Tests must run in the `science` conda env (the o
 - One test file: `conda run -n science python -m pytest tests/test_checker.py -v`
 - One test: `pytest "tests/test_checker.py::TestIsSameFile::test_is_same_file_hash_mode_identical"`
 - CLI smoke (after `pip install -e .`): `filelib --help`, `filelib copy --help`; without reinstalling: `python -m filelib.cli --help`
-- Lint/format: `conda run -n science ruff check .` and `conda run -n science ruff format --check .` (config in ruff.toml; the repo is format-clean). CI runs both plus pytest on ubuntu/windows × Python 3.9/3.13 (`.github/workflows/ci.yml`); pre-commit hooks mirror them (`.pre-commit-config.yaml`).
+- Lint/format: `conda run -n science ruff check .` and `conda run -n science ruff format --check .` (config in ruff.toml; the repo is format-clean). CI runs both plus pytest on ubuntu/macos/windows × Python 3.9/3.13 (`.github/workflows/ci.yml`); pre-commit hooks mirror them (`.pre-commit-config.yaml`).
 
 ## Architecture
 
