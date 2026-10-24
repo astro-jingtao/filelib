@@ -1,4 +1,5 @@
 """HTTP downloads over requests, streaming to disk."""
+
 from __future__ import annotations
 
 import os
@@ -6,9 +7,13 @@ import os
 import requests
 
 
-def download_response(url: str, filename: str, force: bool = False,
-                      verbose: bool = False,
-                      timeout: float | None = None) -> int | None:
+def download_response(
+    url: str,
+    filename: str,
+    force: bool = False,
+    verbose: bool = False,
+    timeout: float | None = None,
+) -> int | None:
     """Download ``url`` to ``filename`` with requests (streaming).
 
     Behavior:
@@ -27,7 +32,7 @@ def download_response(url: str, filename: str, force: bool = False,
 
     response = requests.get(url, stream=True, timeout=timeout)
     if response.status_code == 200:
-        with open(filename, 'wb') as f:
+        with open(filename, "wb") as f:
             f.writelines(response.iter_content(chunk_size=8192))
         if verbose:
             print(f"Download completed successfully for {filename}!")

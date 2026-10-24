@@ -7,7 +7,6 @@ import filelib.skills as skills_pkg
 
 
 class TestSkillsTree:
-
     def test_skill_files_present_in_package(self):
         """skill 容器与部署指南随包存在（安装后 skills 目录为空属落地缺陷）"""
         root = Path(skills_pkg.__file__).parent

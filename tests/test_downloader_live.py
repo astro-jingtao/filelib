@@ -20,7 +20,6 @@ pytestmark = pytest.mark.skipif(
 
 
 class TestLiveDownload:
-
     def test_live_200_writes_file(self, tmp_path):
         target = tmp_path / "index.html"
         status = download_response("https://www.example.com/", str(target))
@@ -29,7 +28,6 @@ class TestLiveDownload:
 
     def test_live_non_200_returns_status(self, tmp_path):
         target = tmp_path / "missing.html"
-        status = download_response(
-            "https://www.example.com/no-such-page", str(target))
+        status = download_response("https://www.example.com/no-such-page", str(target))
         assert status == 404
         assert not target.exists()

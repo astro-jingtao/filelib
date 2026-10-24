@@ -1,4 +1,5 @@
 """Directory scanning utilities: file listing and emptiness checks."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -7,13 +8,15 @@ from os import PathLike
 import warnings
 
 
-def ls(directory: str = ".",
-       *,
-       match_func: Callable[[str], bool] | None = None,
-       recursive: bool = False,
-       path_type: str = 'abs_full_path',
-       on_duplicates: str = "raise",
-       follow_symlinks: bool = True) -> list[str]:
+def ls(
+    directory: str = ".",
+    *,
+    match_func: Callable[[str], bool] | None = None,
+    recursive: bool = False,
+    path_type: str = "abs_full_path",
+    on_duplicates: str = "raise",
+    follow_symlinks: bool = True,
+) -> list[str]:
     """
     List files in a directory, similar to the shell 'ls' command, with support for custom filtering and path formatting.
 
@@ -59,7 +62,7 @@ def ls(directory: str = ".",
 
     Examples
     --------
-    >>> ls(match_func=lambda f: f.endswith(('.jpg', '.gif')), recursive=True)
+    >>> ls(match_func=lambda f: f.endswith((".jpg", ".gif")), recursive=True)
     ['/path/to/img1.jpg', '/path/to/subdir/img2.gif']
     """
 
@@ -67,8 +70,7 @@ def ls(directory: str = ".",
     # 且不依赖"是否恰好存在重复名"才暴露。
     if on_duplicates not in ("raise", "warn", "ignore"):
         raise ValueError(
-            f"Invalid on_duplicates: {on_duplicates}. "
-            "Choose from 'raise', 'warn', or 'ignore'."
+            f"Invalid on_duplicates: {on_duplicates}. Choose from 'raise', 'warn', or 'ignore'."
         )
 
     result = []
@@ -88,8 +90,11 @@ def ls(directory: str = ".",
             break
 
     # check if same file name in result when path_type is 'file_only'
-    if ((path_type == 'file_only') and (on_duplicates != 'ignore')
-            and len(result) != len(set(result))):
+    if (
+        (path_type == "file_only")
+        and (on_duplicates != "ignore")
+        and len(result) != len(set(result))
+    ):
         msg = (
             "Duplicate file names found in 'file_only' mode. "
             "Consider using 'rel_path', 'raw_full_path', or 'abs_full_path' for unique paths."
@@ -102,8 +107,7 @@ def ls(directory: str = ".",
     return sorted(result)
 
 
-def _format_entry_path(root: str, file: str, directory: str,
-                       path_type: str) -> str:
+def _format_entry_path(root: str, file: str, directory: str, path_type: str) -> str:
     """Build the output path for one file according to ``path_type``.
 
     Raises ValueError for an unknown ``path_type`` — only when a file is
@@ -156,7 +160,7 @@ def is_empty_dir(directory: str | PathLike, recursive: bool = False) -> bool:
 
     Examples
     --------
-    >>> is_empty_dir("some/folder")            # contains only empty subdirs
+    >>> is_empty_dir("some/folder")  # contains only empty subdirs
     False
     >>> is_empty_dir("some/folder", recursive=True)
     True

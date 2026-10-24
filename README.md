@@ -154,8 +154,9 @@ stats = merge_folders(src="backup/photos", dst="library/photos", run_log=True)
 print(stats)
 
 # Windows-style conflict names: photo (1).jpg, photo (2).jpg, ...
-stats = merge_folders(src="backup/photos", dst="library/photos",
-                      rename_format="{stem} ({i}){suffix}", rename_start=1)
+stats = merge_folders(
+    src="backup/photos", dst="library/photos", rename_format="{stem} ({i}){suffix}", rename_start=1
+)
 ```
 
 ### 7) Copy/move a folder while preserving symbolic links
@@ -165,13 +166,11 @@ from filelib.operator import copy, move
 
 # Preview first: prints [dry-run] [RETARGET] lines for links that will be
 # rewritten (also raises PermissionError here if links could not be created)
-copy(src="game/mod", dst="backup/mod", preserve_symlinks=True,
-     retarget_symlinks=True, dry_run=True)
+copy(src="game/mod", dst="backup/mod", preserve_symlinks=True, retarget_symlinks=True, dry_run=True)
 
 # Copy: symlinks are recreated as symlinks; links whose absolute targets
 # point inside "game/mod" are retargeted to point inside "backup/mod"
-copy(src="game/mod", dst="backup/mod", preserve_symlinks=True,
-     retarget_symlinks=True, run_log=True)
+copy(src="game/mod", dst="backup/mod", preserve_symlinks=True, retarget_symlinks=True, run_log=True)
 
 # Move: links are always preserved by the move itself; retarget_symlinks
 # additionally fixes absolute in-tree links, which would otherwise dangle

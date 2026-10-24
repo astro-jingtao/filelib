@@ -31,32 +31,47 @@ exit codes:
 
 def _get_version() -> str:
     try:
-        return version('filelib')
+        return version("filelib")
     except PackageNotFoundError:
-        return 'unknown (not installed as a distribution)'
+        return "unknown (not installed as a distribution)"
 
 
 def _add_common_flags(sub: argparse.ArgumentParser) -> None:
-    sub.add_argument('--dry-run', action='store_true', dest='dry_run',
-                     help='preview only; print the actions without '
-                          'touching the filesystem')
-    sub.add_argument('--run-log', action=argparse.BooleanOptionalAction,
-                     default=True, dest='run_log',
-                     help='print one log line per action (default: on; '
-                          'disable with --no-run-log)')
+    sub.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="preview only; print the actions without touching the filesystem",
+    )
+    sub.add_argument(
+        "--run-log",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        dest="run_log",
+        help="print one log line per action (default: on; disable with --no-run-log)",
+    )
 
 
 def _add_rename_flags(sub: argparse.ArgumentParser) -> None:
-    sub.add_argument('--rename-format', dest='rename_format',
-                     default='{stem}_{i}{suffix}', metavar='FMT',
-                     help="auto-rename template applied to the destination "
-                          "file name; placeholders {stem}, {suffix}, {i} "
-                          "(format specs such as {i:03d} supported; "
-                          "default: '%(default)s')")
-    sub.add_argument('--rename-start', dest='rename_start', type=int,
-                     default=0, metavar='N',
-                     help='first candidate index for auto-renames; use 1 '
-                          'for Windows-style name_1.ext (default: %(default)s)')
+    sub.add_argument(
+        "--rename-format",
+        dest="rename_format",
+        default="{stem}_{i}{suffix}",
+        metavar="FMT",
+        help="auto-rename template applied to the destination "
+        "file name; placeholders {stem}, {suffix}, {i} "
+        "(format specs such as {i:03d} supported; "
+        "default: '%(default)s')",
+    )
+    sub.add_argument(
+        "--rename-start",
+        dest="rename_start",
+        type=int,
+        default=0,
+        metavar="N",
+        help="first candidate index for auto-renames; use 1 "
+        "for Windows-style name_1.ext (default: %(default)s)",
+    )
 
 
 def cmd_copy(args: argparse.Namespace) -> int:
@@ -64,40 +79,50 @@ def cmd_copy(args: argparse.Namespace) -> int:
     # --retarget-symlinks implies --preserve-symlinks: the library would
     # otherwise warn and silently disable retargeting (a hidden no-op for
     # a user who explicitly asked for retargeting).
-    copy(args.src, args.dst,
-         dry_run=args.dry_run,
-         exist_policy=args.exist_policy,
-         make_dir=args.make_dir,
-         run_log=args.run_log,
-         preserve_symlinks=args.preserve_symlinks or args.retarget_symlinks,
-         retarget_symlinks=args.retarget_symlinks,
-         rename_format=args.rename_format,
-         rename_start=args.rename_start)
+    copy(
+        args.src,
+        args.dst,
+        dry_run=args.dry_run,
+        exist_policy=args.exist_policy,
+        make_dir=args.make_dir,
+        run_log=args.run_log,
+        preserve_symlinks=args.preserve_symlinks or args.retarget_symlinks,
+        retarget_symlinks=args.retarget_symlinks,
+        rename_format=args.rename_format,
+        rename_start=args.rename_start,
+    )
     return 0
 
 
 def cmd_move(args: argparse.Namespace) -> int:
     """Run the ``move`` subcommand."""
-    move(args.src, args.dst,
-         dry_run=args.dry_run,
-         exist_policy=args.exist_policy,
-         make_dir=args.make_dir,
-         run_log=args.run_log,
-         retarget_symlinks=args.retarget_symlinks,
-         rename_format=args.rename_format,
-         rename_start=args.rename_start)
+    move(
+        args.src,
+        args.dst,
+        dry_run=args.dry_run,
+        exist_policy=args.exist_policy,
+        make_dir=args.make_dir,
+        run_log=args.run_log,
+        retarget_symlinks=args.retarget_symlinks,
+        rename_format=args.rename_format,
+        rename_start=args.rename_start,
+    )
     return 0
 
 
 def cmd_merge(args: argparse.Namespace) -> int:
     """Run the ``merge`` subcommand and print the summary line."""
-    stats = merge_folders(args.src, args.dst,
-                          dry_run=args.dry_run,
-                          run_log=args.run_log,
-                          rename_format=args.rename_format,
-                          rename_start=args.rename_start)
-    print(f"Summary: {stats['copied']} copied, {stats['skipped']} skipped, "
-          f"{stats['renamed']} renamed")
+    stats = merge_folders(
+        args.src,
+        args.dst,
+        dry_run=args.dry_run,
+        run_log=args.run_log,
+        rename_format=args.rename_format,
+        rename_start=args.rename_start,
+    )
+    print(
+        f"Summary: {stats['copied']} copied, {stats['skipped']} skipped, {stats['renamed']} renamed"
+    )
     return 0
 
 
@@ -126,94 +151,112 @@ def cmd_check_image(args: argparse.Namespace) -> int:
         else:
             print(f"{path}: ok")
             ok += 1
-    print(f"Summary: {len(args.files)} files: {ok} ok, {corrupted} corrupted, "
-          f"{unsupported} unsupported, {errors} errors")
+    print(
+        f"Summary: {len(args.files)} files: {ok} ok, {corrupted} corrupted, "
+        f"{unsupported} unsupported, {errors} errors"
+    )
     return 1 if (corrupted or errors) else 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argparse parser with all subcommands."""
     parser = argparse.ArgumentParser(
-        prog='filelib',
-        description='File utilities: copy/move with conflict policies and '
-                    'symlink retargeting, non-overwriting folder merge, '
-                    'image corruption checks.',
+        prog="filelib",
+        description="File utilities: copy/move with conflict policies and "
+        "symlink retargeting, non-overwriting folder merge, "
+        "image corruption checks.",
         epilog=_EXIT_CODES_EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--version', action='version',
-                        version=f'%(prog)s {_get_version()}')
-    sub = parser.add_subparsers(dest='command', required=True,
-                                metavar='COMMAND')
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
+    sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
     p_copy = sub.add_parser(
-        'copy',
-        help='copy a file or directory (symlinks are followed by default)')
-    p_copy.add_argument('src', help='source file, directory, or symlink')
-    p_copy.add_argument('dst',
-                        help='destination path (existing dir: copied into '
-                             'it as dst/<basename(src)>)')
-    p_copy.add_argument('--exist-policy', dest='exist_policy',
-                        choices=['default', 'overwrite', 'rename'],
-                        default='default',
-                        help='what to do when dst exists as a file '
-                             '(default: %(default)s)')
-    p_copy.add_argument('--make-dir', action='store_true', dest='make_dir',
-                        help='create missing parent directories of dst')
-    p_copy.add_argument('--preserve-symlinks', action='store_true',
-                        dest='preserve_symlinks',
-                        help='copy symlinks as links instead of following '
-                             'them')
-    p_copy.add_argument('--retarget-symlinks', action='store_true',
-                        dest='retarget_symlinks',
-                        help='rewrite absolute in-tree link targets in the '
-                             'copy (implies --preserve-symlinks)')
+        "copy", help="copy a file or directory (symlinks are followed by default)"
+    )
+    p_copy.add_argument("src", help="source file, directory, or symlink")
+    p_copy.add_argument(
+        "dst", help="destination path (existing dir: copied into it as dst/<basename(src)>)"
+    )
+    p_copy.add_argument(
+        "--exist-policy",
+        dest="exist_policy",
+        choices=["default", "overwrite", "rename"],
+        default="default",
+        help="what to do when dst exists as a file (default: %(default)s)",
+    )
+    p_copy.add_argument(
+        "--make-dir",
+        action="store_true",
+        dest="make_dir",
+        help="create missing parent directories of dst",
+    )
+    p_copy.add_argument(
+        "--preserve-symlinks",
+        action="store_true",
+        dest="preserve_symlinks",
+        help="copy symlinks as links instead of following them",
+    )
+    p_copy.add_argument(
+        "--retarget-symlinks",
+        action="store_true",
+        dest="retarget_symlinks",
+        help="rewrite absolute in-tree link targets in the copy (implies --preserve-symlinks)",
+    )
     _add_common_flags(p_copy)
     _add_rename_flags(p_copy)
     p_copy.set_defaults(func=cmd_copy)
 
-    p_move = sub.add_parser(
-        'move',
-        help='move a file or directory (symlinks always move as links)')
-    p_move.add_argument('src', help='source file, directory, or symlink')
-    p_move.add_argument('dst',
-                        help='destination path (existing dir: moved into '
-                             'it as dst/<basename(src)>)')
-    p_move.add_argument('--exist-policy', dest='exist_policy',
-                        choices=['default', 'overwrite', 'rename'],
-                        default='default',
-                        help='what to do when dst exists as a file '
-                             '(default: %(default)s)')
-    p_move.add_argument('--make-dir', action='store_true', dest='make_dir',
-                        help='create missing parent directories of dst')
-    p_move.add_argument('--retarget-symlinks', action='store_true',
-                        dest='retarget_symlinks',
-                        help='after the move, rewrite absolute in-tree '
-                             'link targets that would dangle')
+    p_move = sub.add_parser("move", help="move a file or directory (symlinks always move as links)")
+    p_move.add_argument("src", help="source file, directory, or symlink")
+    p_move.add_argument(
+        "dst", help="destination path (existing dir: moved into it as dst/<basename(src)>)"
+    )
+    p_move.add_argument(
+        "--exist-policy",
+        dest="exist_policy",
+        choices=["default", "overwrite", "rename"],
+        default="default",
+        help="what to do when dst exists as a file (default: %(default)s)",
+    )
+    p_move.add_argument(
+        "--make-dir",
+        action="store_true",
+        dest="make_dir",
+        help="create missing parent directories of dst",
+    )
+    p_move.add_argument(
+        "--retarget-symlinks",
+        action="store_true",
+        dest="retarget_symlinks",
+        help="after the move, rewrite absolute in-tree link targets that would dangle",
+    )
     _add_common_flags(p_move)
     _add_rename_flags(p_move)
     p_move.set_defaults(func=cmd_move)
 
     p_merge = sub.add_parser(
-        'merge',
-        help='merge src folder into dst folder; never overwrites '
-             '(SHA-256 dedupe, auto-rename on conflict)')
-    p_merge.add_argument('src', help='source folder')
-    p_merge.add_argument('dst',
-                         help='target folder (existing files are kept)')
+        "merge",
+        help="merge src folder into dst folder; never overwrites "
+        "(SHA-256 dedupe, auto-rename on conflict)",
+    )
+    p_merge.add_argument("src", help="source folder")
+    p_merge.add_argument("dst", help="target folder (existing files are kept)")
     _add_common_flags(p_merge)
     _add_rename_flags(p_merge)
     p_merge.set_defaults(func=cmd_merge)
 
     p_chk = sub.add_parser(
-        'check-image',
-        help='check image files (jpeg/png/gif/bmp/webp) for '
-             'truncation/corruption')
-    p_chk.add_argument('files', nargs='+', metavar='FILE',
-                       help='image files to check')
-    p_chk.add_argument('--mime-method', dest='mime_method',
-                       choices=['magic', 'extension'], default='magic',
-                       help='MIME detection from file content or file name '
-                            'suffix (default: %(default)s)')
+        "check-image", help="check image files (jpeg/png/gif/bmp/webp) for truncation/corruption"
+    )
+    p_chk.add_argument("files", nargs="+", metavar="FILE", help="image files to check")
+    p_chk.add_argument(
+        "--mime-method",
+        dest="mime_method",
+        choices=["magic", "extension"],
+        default="magic",
+        help="MIME detection from file content or file name suffix (default: %(default)s)",
+    )
     p_chk.set_defaults(func=cmd_check_image)
 
     return parser
@@ -232,5 +275,5 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

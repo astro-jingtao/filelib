@@ -31,21 +31,17 @@ def _prepare_symlink_tree(tmp_path: Path) -> Path:
 
 
 class TestLs:
-
     @pytest.fixture(autouse=True)
     def setup_tmpdir(self, tmp_path: Path) -> None:
         self.root = _prepare_symlink_tree(tmp_path)
 
     def test_ls_recursive_default_follows_directory_symlink(self) -> None:
-        files = ls(directory=str(self.root),
-                   recursive=True,
-                   path_type="rel_path")
+        files = ls(directory=str(self.root), recursive=True, path_type="rel_path")
         normalized = [Path(path).as_posix() for path in files]
 
         assert normalized == ["link_to_real/sub/data.txt", "real/sub/data.txt"]
 
-    def test_ls_recursive_follow_symlinks_false_skips_symlinked_path(
-            self) -> None:
+    def test_ls_recursive_follow_symlinks_false_skips_symlinked_path(self) -> None:
         files = ls(
             directory=str(self.root),
             recursive=True,
@@ -75,13 +71,11 @@ class TestLsOnDuplicates:
 
     def test_warn_mode_warns_and_returns_result(self) -> None:
         with pytest.warns(UserWarning, match="Duplicate file names"):
-            result = ls(str(self.root), recursive=True,
-                        path_type="file_only", on_duplicates="warn")
+            result = ls(str(self.root), recursive=True, path_type="file_only", on_duplicates="warn")
         assert result == ["data.txt", "data.txt"]
 
     def test_ignore_mode_returns_duplicates(self) -> None:
-        result = ls(str(self.root), recursive=True,
-                    path_type="file_only", on_duplicates="ignore")
+        result = ls(str(self.root), recursive=True, path_type="file_only", on_duplicates="ignore")
         assert result == ["data.txt", "data.txt"]
 
     def test_invalid_on_duplicates_raises_value_error(self) -> None:
@@ -100,7 +94,6 @@ class TestLsOnDuplicates:
 
 
 class TestIsEmptyDir:
-
     @pytest.fixture(autouse=True)
     def setup_tmpdir(self, tmp_path: Path) -> None:
         self.root = tmp_path / "empty_check"

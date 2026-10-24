@@ -143,8 +143,12 @@ Files are matched by relative path; nothing is ever overwritten:
 ```python
 from filelib.scanner import ls
 
-stale = ls(directory='data', match_func=lambda n: n.endswith('.tmp'),
-           recursive=True, path_type='abs_full_path')
+stale = ls(
+    directory="data",
+    match_func=lambda n: n.endswith(".tmp"),
+    recursive=True,
+    path_type="abs_full_path",
+)
 ```
 
 ### Move with preview, then execute
@@ -152,10 +156,8 @@ stale = ls(directory='data', match_func=lambda n: n.endswith('.tmp'),
 ```python
 from filelib.operator import move
 
-move('a/source.txt', 'b/target.txt', dry_run=True,
-     exist_policy='rename', make_dir=True)
-move('a/source.txt', 'b/target.txt', run_log=True,
-     exist_policy='rename', make_dir=True)
+move("a/source.txt", "b/target.txt", dry_run=True, exist_policy="rename", make_dir=True)
+move("a/source.txt", "b/target.txt", run_log=True, exist_policy="rename", make_dir=True)
 ```
 
 ### Merge folders with Windows-style conflict names
@@ -163,9 +165,10 @@ move('a/source.txt', 'b/target.txt', run_log=True,
 ```python
 from filelib.operator import merge_folders
 
-stats = merge_folders('incoming', 'archive', dry_run=True)   # exact preview
-stats = merge_folders('incoming', 'archive', run_log=True,
-                      rename_format='{stem} ({i}){suffix}', rename_start=1)
+stats = merge_folders("incoming", "archive", dry_run=True)  # exact preview
+stats = merge_folders(
+    "incoming", "archive", run_log=True, rename_format="{stem} ({i}){suffix}", rename_start=1
+)
 ```
 
 ### Transport a tree whose links must survive
@@ -173,10 +176,10 @@ stats = merge_folders('incoming', 'archive', run_log=True,
 ```python
 from filelib.operator import copy
 
-copy('game/mod', 'backup/mod', preserve_symlinks=True,
-     retarget_symlinks=True, dry_run=True)   # previews [RETARGET] lines
-copy('game/mod', 'backup/mod', preserve_symlinks=True,
-     retarget_symlinks=True, run_log=True)
+copy(
+    "game/mod", "backup/mod", preserve_symlinks=True, retarget_symlinks=True, dry_run=True
+)  # previews [RETARGET] lines
+copy("game/mod", "backup/mod", preserve_symlinks=True, retarget_symlinks=True, run_log=True)
 ```
 
 ### Audit a download batch for truncated images
@@ -185,12 +188,16 @@ copy('game/mod', 'backup/mod', preserve_symlinks=True,
 from filelib.scanner import ls
 from filelib.identifier import is_file_corrupted
 
-imgs = ls('downloads', recursive=True,
-          match_func=lambda n: n.lower().endswith(
-              ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')))
-bad = [p for p in imgs
-       if is_file_corrupted(p, mime_method='magic',
-                            unsupported_policy='return') is True]
+imgs = ls(
+    "downloads",
+    recursive=True,
+    match_func=lambda n: n.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")),
+)
+bad = [
+    p
+    for p in imgs
+    if is_file_corrupted(p, mime_method="magic", unsupported_policy="return") is True
+]
 ```
 
 From the shell: `filelib check-image <files...>` — exit code 1 when anything is corrupted.

@@ -18,7 +18,6 @@ def _create_file_symlink(link: Path, target: Path) -> None:
 
 
 class TestIsSamePath:
-
     def test_identical_strings_are_same(self, tmp_path):
         target = tmp_path / "a.txt"
         target.write_text("data")
@@ -41,8 +40,7 @@ class TestIsSamePath:
         spelled = str(tmp_path) + os.sep + os.sep + "a.txt"
         assert is_same_path(spelled, str(target)) is True
 
-    def test_relative_spelling_matches_absolute(self, tmp_path,
-                                                monkeypatch):
+    def test_relative_spelling_matches_absolute(self, tmp_path, monkeypatch):
         target = tmp_path / "a.txt"
         target.write_text("data")
         monkeypatch.chdir(tmp_path)

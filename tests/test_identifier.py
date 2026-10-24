@@ -7,14 +7,13 @@ from filelib.identifier import is_file_corrupted
 # Minimal synthetic PNG: signature + IHDR chunk (+ IEND chunk when
 # complete). image_complete's strict PNG check only requires the file to
 # end with the IEND chunk, so no valid CRCs are needed.
-PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
-PNG_IHDR = b'\x00\x00\x00\x0dIHDR' + b'\x00' * 13 + b'\x00\x00\x00\x00'
-PNG_IEND = b'\x00\x00\x00\x00IEND\xaeB\x60\x82'
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+PNG_IHDR = b"\x00\x00\x00\x0dIHDR" + b"\x00" * 13 + b"\x00\x00\x00\x00"
+PNG_IEND = b"\x00\x00\x00\x00IEND\xaeB\x60\x82"
 
 
 def _write_png(path: Path, complete: bool = True) -> Path:
-    path.write_bytes(PNG_SIGNATURE + PNG_IHDR
-                     + (PNG_IEND if complete else b''))
+    path.write_bytes(PNG_SIGNATURE + PNG_IHDR + (PNG_IEND if complete else b""))
     return path
 
 
@@ -53,22 +52,19 @@ class TestIsFileCorrupted:
 
     def test_unsupported_mime_extension_method_returns_none(self):
         """extension 模式下未知后缀：返回 None 而非抛错"""
-        assert is_file_corrupted(str(self.notes_txt),
-                                 mime_method='extension') is None
+        assert is_file_corrupted(str(self.notes_txt), mime_method="extension") is None
 
     def test_unsupported_policy_raise_raises(self):
         """unsupported_policy='raise'：抛 ValueError"""
         with pytest.raises(ValueError, match="Unsupported MIME type"):
-            is_file_corrupted(str(self.notes_txt),
-                              unsupported_policy='raise')
+            is_file_corrupted(str(self.notes_txt), unsupported_policy="raise")
 
     def test_invalid_mime_method_raises(self):
         """非法 mime_method：抛 ValueError"""
         with pytest.raises(ValueError, match="Invalid mime_method"):
-            is_file_corrupted(str(self.complete_png), mime_method='bogus')
+            is_file_corrupted(str(self.complete_png), mime_method="bogus")
 
     def test_explicit_mime_skips_detection(self):
         """显式传入 mime：跳过探测，直接按该 MIME 检查"""
         # text/plain 不在受支持列表中 -> None，证明没有走文件探测
-        assert is_file_corrupted(str(self.complete_png),
-                                 mime='text/plain') is None
+        assert is_file_corrupted(str(self.complete_png), mime="text/plain") is None

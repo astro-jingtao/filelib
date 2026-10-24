@@ -11,7 +11,6 @@ from filelib.operator import copy, dry_run_session, get_unique_new_dst, merge_fo
 
 
 class TestRemove:
-
     # ===== Fixtures: 准备测试环境 =====
 
     @pytest.fixture(autouse=True)
@@ -35,8 +34,7 @@ class TestRemove:
         # 非空文件夹: test_root/non_empty_dir
         self.non_empty_dir_path = self.test_dir / "non_empty_dir"
         self.non_empty_dir_path.mkdir()
-        (self.non_empty_dir_path /
-         "inner_file.txt").write_text("inner content")
+        (self.non_empty_dir_path / "inner_file.txt").write_text("inner content")
 
         return
 
@@ -77,7 +75,7 @@ class TestRemove:
 
     def test_remove_non_empty_dir_recursive_skip(self, capsys):
         """测试非空文件夹：recursive='skip'，跳过删除并打印日志"""
-        remove(str(self.non_empty_dir_path), recursive='skip')
+        remove(str(self.non_empty_dir_path), recursive="skip")
 
         capsys.readouterr()
         # 当前实现在非 dry_run 时没有打印跳过日志，所以这里主要验证文件还在
@@ -123,7 +121,7 @@ class TestRemove:
 
     def test_dry_run_non_empty_dir_recursive_skip(self, capsys):
         """测试 Dry Run：非空文件夹，recursive='skip' 模式，应打印跳过日志"""
-        remove(str(self.non_empty_dir_path), recursive='skip', dry_run=True)
+        remove(str(self.non_empty_dir_path), recursive="skip", dry_run=True)
 
         captured = capsys.readouterr()
         assert "[dry-run] Skipped non-empty directory" in captured.out
@@ -160,7 +158,7 @@ class TestRemove:
 
     def test_run_log_non_empty_dir_recursive_skip(self, capsys):
         """测试 run_log：非空文件夹 recursive='skip' 时打印跳过日志"""
-        remove(str(self.non_empty_dir_path), recursive='skip', run_log=True)
+        remove(str(self.non_empty_dir_path), recursive="skip", run_log=True)
 
         captured = capsys.readouterr()
         assert "Skipped non-empty directory" in captured.out
@@ -178,7 +176,6 @@ class TestRemove:
 
 
 class TestMove:
-
     @pytest.fixture(autouse=True)
     def setup_tmpdir(self, tmp_path):
         self.test_dir = tmp_path / "move_root"
@@ -272,7 +269,7 @@ class TestMove:
         dst = self.test_dir / "blocker.txt"
         dst.write_text("block")
 
-        move(str(self.src_dir), str(dst), exist_policy='overwrite')
+        move(str(self.src_dir), str(dst), exist_policy="overwrite")
 
         assert dst.is_dir()
         assert (dst / "source.txt").read_text() == "source content"
@@ -283,7 +280,7 @@ class TestMove:
         dst = self.test_dir / "blocker.txt"
         dst.write_text("block")
 
-        move(str(self.src_dir), str(dst), exist_policy='rename')
+        move(str(self.src_dir), str(dst), exist_policy="rename")
 
         assert dst.read_text() == "block"
         assert (self.test_dir / "blocker_0.txt" / "source.txt").is_file()
@@ -313,7 +310,7 @@ class TestMove:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        move(str(self.src_file), str(dst_file), exist_policy='overwrite')
+        move(str(self.src_file), str(dst_file), exist_policy="overwrite")
 
         assert not self.src_file.exists()
         assert dst_file.exists()
@@ -328,7 +325,7 @@ class TestMove:
         renamed_0 = self.dst_dir / "target_0.txt"
         renamed_0.write_text("occupied")
 
-        move(str(self.src_file), str(dst_file), exist_policy='rename')
+        move(str(self.src_file), str(dst_file), exist_policy="rename")
 
         renamed_1 = self.dst_dir / "target_1.txt"
         assert not self.src_file.exists()
@@ -343,7 +340,7 @@ class TestMove:
         dst_file.write_text("old content")
 
         with pytest.raises(ValueError, match="exist_policy must be"):
-            move(str(self.src_file), str(dst_file), exist_policy='invalid')
+            move(str(self.src_file), str(dst_file), exist_policy="invalid")
 
         assert self.src_file.exists()
 
@@ -352,8 +349,12 @@ class TestMove:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        move(str(self.src_file), str(dst_file), exist_policy='rename',
-             rename_format='{i:02d}_{stem}{suffix}')
+        move(
+            str(self.src_file),
+            str(dst_file),
+            exist_policy="rename",
+            rename_format="{i:02d}_{stem}{suffix}",
+        )
 
         renamed = self.dst_dir / "00_target.txt"
         assert not self.src_file.exists()
@@ -366,8 +367,13 @@ class TestMove:
         dst_file.write_text("old content")
 
         with pytest.raises(ValueError, match="Invalid rename_format"):
-            move(str(self.src_file), str(dst_file), dry_run=True,
-                 exist_policy='rename', rename_format='{oops}')
+            move(
+                str(self.src_file),
+                str(dst_file),
+                dry_run=True,
+                exist_policy="rename",
+                rename_format="{oops}",
+            )
 
         assert self.src_file.exists()
         assert dst_file.read_text() == "old content"
@@ -388,10 +394,7 @@ class TestMove:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        move(str(self.src_file),
-             str(dst_file),
-             dry_run=True,
-             exist_policy='overwrite')
+        move(str(self.src_file), str(dst_file), dry_run=True, exist_policy="overwrite")
 
         captured = capsys.readouterr()
         assert "[dry-run] Removed existing file" in captured.out
@@ -454,7 +457,6 @@ class TestMove:
 
 
 class TestCopy:
-
     @pytest.fixture(autouse=True)
     def setup_tmpdir(self, tmp_path):
         self.test_dir = tmp_path / "copy_root"
@@ -500,11 +502,9 @@ class TestCopy:
         """相对路径 dst + make_dir=True：在 cwd 下创建缺失的父目录"""
         monkeypatch.chdir(self.dst_dir)
 
-        copy(str(self.src_file), os.path.join("new_sub", "deep", "out.txt"),
-             make_dir=True)
+        copy(str(self.src_file), os.path.join("new_sub", "deep", "out.txt"), make_dir=True)
 
-        assert (self.dst_dir / "new_sub" / "deep" / "out.txt").read_text() \
-            == "source content"
+        assert (self.dst_dir / "new_sub" / "deep" / "out.txt").read_text() == "source content"
 
     def test_copy_to_existing_directory_success(self):
         """目标为已有目录：复制后文件进入该目录"""
@@ -550,7 +550,7 @@ class TestCopy:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        copy(str(self.src_file), str(dst_file), exist_policy='overwrite')
+        copy(str(self.src_file), str(dst_file), exist_policy="overwrite")
 
         assert self.src_file.exists()
         assert dst_file.exists()
@@ -564,7 +564,7 @@ class TestCopy:
         renamed_0 = self.dst_dir / "target_0.txt"
         renamed_0.write_text("occupied")
 
-        copy(str(self.src_file), str(dst_file), exist_policy='rename')
+        copy(str(self.src_file), str(dst_file), exist_policy="rename")
 
         renamed_1 = self.dst_dir / "target_1.txt"
         assert self.src_file.exists()
@@ -579,7 +579,7 @@ class TestCopy:
         dst_file.write_text("old content")
 
         with pytest.raises(ValueError, match="exist_policy must be"):
-            copy(str(self.src_file), str(dst_file), exist_policy='invalid')
+            copy(str(self.src_file), str(dst_file), exist_policy="invalid")
 
         assert self.src_file.exists()
 
@@ -588,8 +588,13 @@ class TestCopy:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        copy(str(self.src_file), str(dst_file), exist_policy='rename',
-             rename_format='{stem} ({i}){suffix}', rename_start=1)
+        copy(
+            str(self.src_file),
+            str(dst_file),
+            exist_policy="rename",
+            rename_format="{stem} ({i}){suffix}",
+            rename_start=1,
+        )
 
         renamed = self.dst_dir / "target (1).txt"
         assert self.src_file.exists()
@@ -602,8 +607,7 @@ class TestCopy:
         dst_file.write_text("old content")
 
         with pytest.raises(ValueError, match="Invalid rename_format"):
-            copy(str(self.src_file), str(dst_file), exist_policy='rename',
-                 rename_format='{oops}')
+            copy(str(self.src_file), str(dst_file), exist_policy="rename", rename_format="{oops}")
 
         assert self.src_file.exists()
         assert dst_file.read_text() == "old content"
@@ -634,7 +638,7 @@ class TestCopy:
         dst = self.dst_dir / "blocker.txt"
         dst.write_text("block")
 
-        copy(str(self.src_folder), str(dst), exist_policy='overwrite')
+        copy(str(self.src_folder), str(dst), exist_policy="overwrite")
 
         assert dst.is_dir()
         assert (dst / "inner.txt").read_text() == "inner content"
@@ -645,7 +649,7 @@ class TestCopy:
         dst = self.dst_dir / "blocker.txt"
         dst.write_text("block")
 
-        copy(str(self.src_folder), str(dst), exist_policy='rename')
+        copy(str(self.src_folder), str(dst), exist_policy="rename")
 
         assert dst.read_text() == "block"
         assert (self.dst_dir / "blocker_0.txt" / "inner.txt").is_file()
@@ -673,10 +677,7 @@ class TestCopy:
         dst_file = self.dst_dir / "target.txt"
         dst_file.write_text("old content")
 
-        copy(str(self.src_file),
-             str(dst_file),
-             dry_run=True,
-             exist_policy='overwrite')
+        copy(str(self.src_file), str(dst_file), dry_run=True, exist_policy="overwrite")
 
         captured = capsys.readouterr()
         assert "[dry-run] Removed existing file" in captured.out
@@ -763,18 +764,14 @@ class TestCopy:
         monkeypatch.setattr(operator_module.shutil, "copytree", fake_copytree)
 
         dst_folder = self.dst_dir / "copied_folder"
-        copy(str(self.src_folder),
-             str(dst_folder),
-             copy_function=fake_copy_function)
+        copy(str(self.src_folder), str(dst_folder), copy_function=fake_copy_function)
 
         assert calls["src"] == str(self.src_folder)
         assert calls["dst"] == str(dst_folder)
         assert calls["copy_function"] is fake_copy_function
 
 
-def _make_link_or_skip(link_path: Path,
-                       target: str,
-                       target_is_directory: bool = False) -> None:
+def _make_link_or_skip(link_path: Path, target: str, target_is_directory: bool = False) -> None:
     """Create a symlink, skipping on Windows without link privilege."""
     try:
         link_path.symlink_to(target, target_is_directory=target_is_directory)
@@ -805,55 +802,52 @@ class TestMapLinkTarget:
         """Docstring (_map_link_target): absolute target inside src_root
         is remapped to the same relative location under dst_root."""
         result = operator_module._map_link_target(
-            r"C:\root\src_dir\sub\real.txt", r"C:\root\src_dir", r"D:\backup\copy")
-        assert os.path.normpath(result) == \
-            os.path.normpath(r"D:\backup\copy\sub\real.txt")
+            r"C:\root\src_dir\sub\real.txt", r"C:\root\src_dir", r"D:\backup\copy"
+        )
+        assert os.path.normpath(result) == os.path.normpath(r"D:\backup\copy\sub\real.txt")
 
     def test_target_equal_to_src_root_maps_to_dst_root(self):
         """Docstring (_map_link_target): target == src_root itself maps
         to dst_root (edge case, must not crash)."""
-        result = operator_module._map_link_target(
-            r"C:\root\src_dir", r"C:\root\src_dir", r"D:\dst")
+        result = operator_module._map_link_target(r"C:\root\src_dir", r"C:\root\src_dir", r"D:\dst")
         assert os.path.normpath(result) == os.path.normpath(r"D:\dst")
 
     def test_target_outside_src_unchanged(self):
         """Docstring (_map_link_target): absolute target outside src_root
         is returned verbatim."""
         target = r"C:\root\external\file.txt"
-        result = operator_module._map_link_target(
-            target, r"C:\root\src_dir", r"D:\dst")
+        result = operator_module._map_link_target(target, r"C:\root\src_dir", r"D:\dst")
         assert result == target
 
     def test_relative_target_unchanged(self):
         """Docstring (_map_link_target): relative targets are returned
         verbatim (they still resolve correctly after a tree move)."""
-        result = operator_module._map_link_target(
-            "real.txt", r"C:\root\src_dir", r"D:\dst")
+        result = operator_module._map_link_target("real.txt", r"C:\root\src_dir", r"D:\dst")
         assert result == "real.txt"
 
     def test_cross_drive_target_unchanged(self):
         """Docstring (_map_link_target): cross-drive targets are returned
         verbatim (commonpath raises ValueError internally)."""
         target = r"D:\other\file.txt"
-        result = operator_module._map_link_target(
-            target, r"C:\root\src_dir", r"D:\dst")
+        result = operator_module._map_link_target(target, r"C:\root\src_dir", r"D:\dst")
         assert result == target
 
     def test_windows_long_path_prefix_preserved(self):
         """Docstring (_map_link_target): the Windows \\\\?\\ long-path
         prefix survives the mapping."""
         target = r"\\?\C:\root\src_dir\sub\real.txt"
-        result = operator_module._map_link_target(
-            target, r"C:\root\src_dir", r"D:\dst")
+        result = operator_module._map_link_target(target, r"C:\root\src_dir", r"D:\dst")
         assert result.startswith("\\\\?\\")
-        assert os.path.normpath(result.removeprefix("\\\\?\\")) == \
-            os.path.normpath(r"D:\dst\sub\real.txt")
+        assert os.path.normpath(result.removeprefix("\\\\?\\")) == os.path.normpath(
+            r"D:\dst\sub\real.txt"
+        )
 
     def test_nonexistent_src_root_still_works(self):
         """Docstring (_map_link_target): pure string math — works after
         a same-drive move when src_root no longer exists."""
         result = operator_module._map_link_target(
-            r"C:\gone\src_dir\sub\real.txt", r"C:\gone\src_dir", r"D:\dst")
+            r"C:\gone\src_dir\sub\real.txt", r"C:\gone\src_dir", r"D:\dst"
+        )
         assert os.path.normpath(result) == os.path.normpath(r"D:\dst\sub\real.txt")
 
 
@@ -879,8 +873,7 @@ class TestCopySymlinks:
         _make_link_or_skip(self.link_file, str(self.src_dir / "real.txt"))
         # absolute dir target inside src -> retargeted
         self.link_dir = self.src_dir / "link_dir"
-        _make_link_or_skip(self.link_dir, str(self.src_dir / "sub"),
-                           target_is_directory=True)
+        _make_link_or_skip(self.link_dir, str(self.src_dir / "sub"), target_is_directory=True)
         # absolute target outside src -> verbatim
         self.link_ext = self.src_dir / "link_ext"
         _make_link_or_skip(self.link_ext, str(self.external / "outside.txt"))
@@ -909,8 +902,7 @@ class TestCopySymlinks:
         """Docstring (copy, flags table): preserve + retarget on a
         directory tree -> links kept as links; absolute in-tree targets
         rewritten to the copy; outside/relative links verbatim."""
-        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
-             retarget_symlinks=True)
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True, retarget_symlinks=True)
 
         dst_link_file = self.dst / "link_file"
         dst_link_dir = self.dst / "link_dir"
@@ -918,16 +910,15 @@ class TestCopySymlinks:
         assert dst_link_dir.is_symlink()
 
         # in-tree absolute targets are retargeted to the copy
-        assert os.path.normpath(_readlink_clean(dst_link_file)) == \
-            os.path.normpath(str(self.dst / "real.txt"))
+        assert os.path.normpath(_readlink_clean(dst_link_file)) == os.path.normpath(
+            str(self.dst / "real.txt")
+        )
         # the dir link resolves inside the copy (not dangling)
         assert dst_link_dir.resolve() == (self.dst / "sub").resolve()
 
         # outside / relative targets still resolve as before (not retargeted)
-        assert (self.dst / "link_ext").resolve() == \
-            (self.external / "outside.txt").resolve()
-        assert (self.dst / "link_rel").resolve() == \
-            (self.dst / "real.txt").resolve()
+        assert (self.dst / "link_ext").resolve() == (self.external / "outside.txt").resolve()
+        assert (self.dst / "link_rel").resolve() == (self.dst / "real.txt").resolve()
 
     @pytest.mark.skipif(os.name != "nt", reason="Windows \\\\?\\ prefix semantics")
     def test_preserve_keeps_windows_long_path_prefix(self):
@@ -936,13 +927,13 @@ class TestCopySymlinks:
         long_target = "\\\\?\\" + str(self.src_dir / "real.txt")
         _make_link_or_skip(self.src_dir / "link_long", long_target)
 
-        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
-             retarget_symlinks=True)
+        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True, retarget_symlinks=True)
 
         new_target = os.readlink(str(self.dst / "link_long"))
         assert new_target.startswith("\\\\?\\")
-        assert os.path.normpath(new_target.removeprefix("\\\\?\\")) == \
-            os.path.normpath(str(self.dst / "real.txt"))
+        assert os.path.normpath(new_target.removeprefix("\\\\?\\")) == os.path.normpath(
+            str(self.dst / "real.txt")
+        )
 
     def test_single_symlink_file_copy_flag_on_recreates_link(self):
         """Docstring (copy, flags table): symlink src + preserve on ->
@@ -954,8 +945,9 @@ class TestCopySymlinks:
         copy(str(link), str(dst_link), preserve_symlinks=True)
 
         assert dst_link.is_symlink()
-        assert os.path.normpath(_readlink_clean(dst_link)) == \
-            os.path.normpath(str(self.src_dir / "real.txt"))
+        assert os.path.normpath(_readlink_clean(dst_link)) == os.path.normpath(
+            str(self.src_dir / "real.txt")
+        )
 
     def test_single_symlink_file_copy_flag_off_copies_content(self):
         """Docstring (copy, flags table): symlink src + flags off ->
@@ -974,8 +966,7 @@ class TestCopySymlinks:
         """Docstring (copy, flags table): directory-link src + preserve
         on -> recreated as a link (not a real directory copy)."""
         link = self.root / "single_dlink"
-        _make_link_or_skip(link, str(self.src_dir / "sub"),
-                           target_is_directory=True)
+        _make_link_or_skip(link, str(self.src_dir / "sub"), target_is_directory=True)
         dst_link = self.root / "single_dlink_copied"
 
         copy(str(link), str(dst_link), preserve_symlinks=True)
@@ -1031,8 +1022,7 @@ class TestCopySymlinks:
         dst = self.root / "blocker.txt"
         dst.write_text("block")
 
-        copy(str(link), str(dst), exist_policy='overwrite',
-             preserve_symlinks=True)
+        copy(str(link), str(dst), exist_policy="overwrite", preserve_symlinks=True)
 
         assert dst.is_symlink()
         assert dst.resolve() == (self.src_dir / "real.txt").resolve()
@@ -1041,8 +1031,7 @@ class TestCopySymlinks:
         """Docstring (copy, flags table): directory tree containing a
         dangling link + flags off -> copytree follows the link and
         raises shutil.Error."""
-        _make_link_or_skip(self.src_dir / "link_dangling",
-                           str(self.root / "gone.txt"))
+        _make_link_or_skip(self.src_dir / "link_dangling", str(self.root / "gone.txt"))
 
         with pytest.raises(shutil.Error):
             copy(str(self.src_dir), str(self.dst))
@@ -1051,8 +1040,13 @@ class TestCopySymlinks:
         """Docstring (copy, Notes): dry_run prints
         '[dry-run] [RETARGET] ...' for every link that would be
         rewritten, and creates nothing."""
-        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
-             retarget_symlinks=True, dry_run=True)
+        copy(
+            str(self.src_dir),
+            str(self.dst),
+            preserve_symlinks=True,
+            retarget_symlinks=True,
+            dry_run=True,
+        )
 
         assert not self.dst.exists()
         captured = capsys.readouterr()
@@ -1061,8 +1055,13 @@ class TestCopySymlinks:
     def test_run_log_reports_retargets(self, capsys):
         """Docstring (copy, run_log param): a real run prints one
         '[RETARGET]' line per rewritten link when run_log=True."""
-        copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
-             retarget_symlinks=True, run_log=True)
+        copy(
+            str(self.src_dir),
+            str(self.dst),
+            preserve_symlinks=True,
+            retarget_symlinks=True,
+            run_log=True,
+        )
 
         captured = capsys.readouterr()
         assert "[RETARGET]" in captured.out
@@ -1077,10 +1076,10 @@ class TestCopySymlinks:
         dst_link_file = self.dst / "link_file"
         assert dst_link_file.is_symlink()
         # original absolute target kept: still points into the source
-        assert os.path.normpath(_readlink_clean(dst_link_file)) == \
-            os.path.normpath(str(self.src_dir / "real.txt"))
-        assert dst_link_file.resolve() == \
-            (self.src_dir / "real.txt").resolve()
+        assert os.path.normpath(_readlink_clean(dst_link_file)) == os.path.normpath(
+            str(self.src_dir / "real.txt")
+        )
+        assert dst_link_file.resolve() == (self.src_dir / "real.txt").resolve()
 
     def test_retarget_without_preserve_warns_and_does_nothing(self, capsys):
         """Docstring (copy, retarget_symlinks param / Notes):
@@ -1147,8 +1146,7 @@ class TestMoveSymlinks:
         self.link_file = self.src_dir / "link_file"
         _make_link_or_skip(self.link_file, str(self.src_dir / "real.txt"))
         self.link_dir = self.src_dir / "link_dir"
-        _make_link_or_skip(self.link_dir, str(self.src_dir / "sub"),
-                           target_is_directory=True)
+        _make_link_or_skip(self.link_dir, str(self.src_dir / "sub"), target_is_directory=True)
         self.link_rel = self.src_dir / "link_rel"
         _make_link_or_skip(self.link_rel, "real.txt")
 
@@ -1163,15 +1161,15 @@ class TestMoveSymlinks:
 
         moved_link = dst_dir / "link_file"
         assert moved_link.is_symlink()
-        assert os.path.normpath(_readlink_clean(moved_link)) == \
-            os.path.normpath(str(dst_dir / "real.txt"))
+        assert os.path.normpath(_readlink_clean(moved_link)) == os.path.normpath(
+            str(dst_dir / "real.txt")
+        )
 
         moved_dlink = dst_dir / "link_dir"
         assert moved_dlink.resolve() == (dst_dir / "sub").resolve()
 
         # relative link still resolves inside the moved tree
-        assert (dst_dir / "link_rel").resolve() == \
-            (dst_dir / "real.txt").resolve()
+        assert (dst_dir / "link_rel").resolve() == (dst_dir / "real.txt").resolve()
 
     def test_default_leaves_in_tree_links_dangling(self):
         """Without the flag, the rename keeps the old absolute target,
@@ -1194,8 +1192,9 @@ class TestMoveSymlinks:
 
         land_root = dst_container / "src_dir"
         assert land_root.is_dir()
-        assert os.path.normpath(_readlink_clean(land_root / "link_file")) == \
-            os.path.normpath(str(land_root / "real.txt"))
+        assert os.path.normpath(_readlink_clean(land_root / "link_file")) == os.path.normpath(
+            str(land_root / "real.txt")
+        )
 
     def test_single_symlink_move_keeps_link(self):
         """Docstring (move, table): a single symlink src is moved as a
@@ -1209,8 +1208,9 @@ class TestMoveSymlinks:
             move(str(link), str(dst_link), retarget_symlinks=flag)
 
             assert dst_link.is_symlink()
-            assert os.path.normpath(_readlink_clean(dst_link)) == \
-                os.path.normpath(str(self.src_dir / "real.txt"))
+            assert os.path.normpath(_readlink_clean(dst_link)) == os.path.normpath(
+                str(self.src_dir / "real.txt")
+            )
 
     def test_symlink_to_existing_file_default_raises(self):
         """Docstring (move, table/Raises): symlink src + existing file
@@ -1234,7 +1234,7 @@ class TestMoveSymlinks:
         dst = self.root / "blocker.txt"
         dst.write_text("block")
 
-        move(str(link), str(dst), exist_policy='overwrite')
+        move(str(link), str(dst), exist_policy="overwrite")
 
         assert dst.is_symlink()
         assert not link.exists()
@@ -1247,7 +1247,7 @@ class TestMoveSymlinks:
         dst = self.root / "blocker.txt"
         dst.write_text("block")
 
-        move(str(link), str(dst), exist_policy='rename')
+        move(str(link), str(dst), exist_policy="rename")
 
         assert dst.read_text() == "block"
         assert (self.root / "blocker_0.txt").is_symlink()
@@ -1270,8 +1270,7 @@ class TestMoveSymlinks:
         rewritten, and moves nothing."""
         dst_dir = self.root / "moved"
 
-        move(str(self.src_dir), str(dst_dir), retarget_symlinks=True,
-             dry_run=True)
+        move(str(self.src_dir), str(dst_dir), retarget_symlinks=True, dry_run=True)
 
         assert self.src_dir.exists()
         assert not dst_dir.exists()
@@ -1302,10 +1301,10 @@ class TestSymlinkPrivilegePrecheck:
         """Docstring (copy, Raises): preserve on + tree containing links
         + missing symlink privilege -> PermissionError before anything
         is copied (dst is not created)."""
-        monkeypatch.setattr(operator_module, "_iter_symlinks",
-                            lambda root: iter([os.path.join(root, "fake")]))
-        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
-                            self._raise_perm)
+        monkeypatch.setattr(
+            operator_module, "_iter_symlinks", lambda root: iter([os.path.join(root, "fake")])
+        )
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege", self._raise_perm)
 
         with pytest.raises(PermissionError, match="no privilege"):
             copy(str(self.src_dir), str(self.dst), preserve_symlinks=True)
@@ -1316,8 +1315,10 @@ class TestSymlinkPrivilegePrecheck:
         """Docstring (copy, preserve_symlinks param): no links in the
         tree -> the privilege probe is skipped and the copy succeeds
         even without symlink rights."""
+
         def spy():
             raise AssertionError("privilege probe must not be called")
+
         monkeypatch.setattr(operator_module, "_check_symlink_privilege", spy)
 
         copy(str(self.src_dir), str(self.dst), preserve_symlinks=True)
@@ -1328,14 +1329,13 @@ class TestSymlinkPrivilegePrecheck:
     def test_copy_precheck_dry_run_also_raises(self, monkeypatch):
         """Docstring (copy, dry_run param): the privilege pre-check runs
         in dry_run mode too, so previews double as feasibility checks."""
-        monkeypatch.setattr(operator_module, "_iter_symlinks",
-                            lambda root: iter([os.path.join(root, "fake")]))
-        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
-                            self._raise_perm)
+        monkeypatch.setattr(
+            operator_module, "_iter_symlinks", lambda root: iter([os.path.join(root, "fake")])
+        )
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege", self._raise_perm)
 
         with pytest.raises(PermissionError, match="no privilege"):
-            copy(str(self.src_dir), str(self.dst), preserve_symlinks=True,
-                 dry_run=True)
+            copy(str(self.src_dir), str(self.dst), preserve_symlinks=True, dry_run=True)
 
         assert not self.dst.exists()
 
@@ -1344,10 +1344,8 @@ class TestSymlinkPrivilegePrecheck:
         would be rewritten + missing privilege -> PermissionError before
         anything is moved (src stays in place)."""
         fake = [(str(self.root / "fake"), "old", "new")]
-        monkeypatch.setattr(operator_module, "_iter_retargets",
-                            lambda root, s, d: iter(fake))
-        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
-                            self._raise_perm)
+        monkeypatch.setattr(operator_module, "_iter_retargets", lambda root, s, d: iter(fake))
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege", self._raise_perm)
 
         with pytest.raises(PermissionError, match="no privilege"):
             move(str(self.src_dir), str(self.dst), retarget_symlinks=True)
@@ -1359,25 +1357,23 @@ class TestSymlinkPrivilegePrecheck:
         """Docstring (move, dry_run param): the privilege pre-check runs
         in dry_run mode too (infeasible move fails in the preview)."""
         fake = [(str(self.root / "fake"), "old", "new")]
-        monkeypatch.setattr(operator_module, "_iter_retargets",
-                            lambda root, s, d: iter(fake))
-        monkeypatch.setattr(operator_module, "_check_symlink_privilege",
-                            self._raise_perm)
+        monkeypatch.setattr(operator_module, "_iter_retargets", lambda root, s, d: iter(fake))
+        monkeypatch.setattr(operator_module, "_check_symlink_privilege", self._raise_perm)
 
         with pytest.raises(PermissionError, match="no privilege"):
-            move(str(self.src_dir), str(self.dst), retarget_symlinks=True,
-                 dry_run=True)
+            move(str(self.src_dir), str(self.dst), retarget_symlinks=True, dry_run=True)
 
         assert self.src_dir.exists()
         assert not self.dst.exists()
 
-    def test_move_precheck_skipped_without_rewritable_links(self,
-                                                            monkeypatch):
+    def test_move_precheck_skipped_without_rewritable_links(self, monkeypatch):
         """Docstring (move, retarget_symlinks param): retarget on but no
         link target would actually change -> no probe, the plain rename
         succeeds without symlink rights."""
+
         def spy():
             raise AssertionError("privilege probe must not be called")
+
         monkeypatch.setattr(operator_module, "_check_symlink_privilege", spy)
 
         move(str(self.src_dir), str(self.dst), retarget_symlinks=True)
@@ -1480,8 +1476,7 @@ class TestMergeFolders:
 
     def test_rename_format_custom(self):
         """Conflicting files are renamed according to a custom format."""
-        merge_folders(self.src, self.dst,
-                      rename_format='{stem} ({i}){suffix}')
+        merge_folders(self.src, self.dst, rename_format="{stem} ({i}){suffix}")
 
         assert (self.dst / "diff (0).txt").read_text() == "source version"
         assert (self.dst / "as_dir (0).txt").read_text() == "source as dir"
@@ -1495,8 +1490,7 @@ class TestMergeFolders:
 
     def test_dry_run_preview_shows_custom_rename_name(self, capsys):
         """Dry-run preview lines show the custom rename name."""
-        merge_folders(self.src, self.dst, dry_run=True,
-                      rename_format='{stem} ({i}){suffix}')
+        merge_folders(self.src, self.dst, dry_run=True, rename_format="{stem} ({i}){suffix}")
 
         out = capsys.readouterr().out
         assert "[dry-run] [RENAME] diff.txt -> diff (0).txt" in out
@@ -1504,7 +1498,7 @@ class TestMergeFolders:
     def test_invalid_rename_format_raises_before_any_copy(self):
         """An invalid format raises before any file is copied."""
         with pytest.raises(ValueError, match="Invalid rename_format"):
-            merge_folders(self.src, self.dst, rename_format='{stem}')
+            merge_folders(self.src, self.dst, rename_format="{stem}")
 
         assert not (self.dst / "new_file.txt").exists()
 
@@ -1543,10 +1537,10 @@ class TestMergeFolders:
         assert "[dry-run] [COPY] new_file.txt" in captured.out
         assert "[dry-run] [COPY] nested/deep.txt" in captured.out
         assert "[dry-run] [SKIP] same.txt (same SHA-256)" in captured.out
-        assert ("[dry-run] [RENAME] diff.txt -> diff_0.txt "
-                "(different SHA-256)") in captured.out
-        assert ("[dry-run] [RENAME] as_dir.txt -> as_dir_0.txt "
-                "(destination is not a file)") in captured.out
+        assert ("[dry-run] [RENAME] diff.txt -> diff_0.txt (different SHA-256)") in captured.out
+        assert (
+            "[dry-run] [RENAME] as_dir.txt -> as_dir_0.txt (destination is not a file)"
+        ) in captured.out
 
     def test_dry_run_still_hashes_identical_files(self):
         """dry_run still hashes, so skipped statistics are accurate."""
@@ -1697,15 +1691,15 @@ class TestGetUniqueNewDst:
 
     def test_custom_format_parentheses(self):
         """A custom template controls the candidate layout."""
-        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                                    rename_format='{stem} ({i}){suffix}')
+        result = get_unique_new_dst(
+            str(self.dir / "diff.txt"), 100, rename_format="{stem} ({i}){suffix}"
+        )
 
         assert result == (self.dir / "diff (0).txt").as_posix()
 
     def test_rename_start_one(self):
         """Numbering starts at rename_start."""
-        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                                    rename_start=1)
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100, rename_start=1)
 
         assert result == (self.dir / "diff_1.txt").as_posix()
 
@@ -1713,15 +1707,15 @@ class TestGetUniqueNewDst:
         """Occupied candidates above rename_start are skipped."""
         (self.dir / "diff_1.txt").write_text("occupied")
 
-        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                                    rename_start=1)
+        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100, rename_start=1)
 
         assert result == (self.dir / "diff_2.txt").as_posix()
 
     def test_index_format_spec_zero_padding(self):
         """Format specs on {i} such as zero padding are supported."""
-        result = get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                                    rename_format='{stem}_{i:03d}{suffix}')
+        result = get_unique_new_dst(
+            str(self.dir / "diff.txt"), 100, rename_format="{stem}_{i:03d}{suffix}"
+        )
 
         assert result == (self.dir / "diff_000.txt").as_posix()
 
@@ -1749,32 +1743,29 @@ class TestGetUniqueNewDst:
     def test_template_without_index_placeholder_raises(self):
         """A constant template raises ValueError instead of looping."""
         with pytest.raises(ValueError, match="varies with the candidate index"):
-            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                               rename_format='{stem}{suffix}')
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100, rename_format="{stem}{suffix}")
 
     def test_unknown_placeholder_raises(self):
         """Unknown placeholders raise ValueError."""
         with pytest.raises(ValueError, match="Invalid rename_format"):
-            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                               rename_format='{stem}_{foo}{suffix}')
+            get_unique_new_dst(
+                str(self.dir / "diff.txt"), 100, rename_format="{stem}_{foo}{suffix}"
+            )
 
     def test_malformed_template_raises(self):
         """A malformed template raises ValueError."""
         with pytest.raises(ValueError, match="Invalid rename_format"):
-            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                               rename_format='{stem')
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100, rename_format="{stem")
 
     def test_negative_rename_start_raises(self):
         """A negative rename_start raises ValueError."""
         with pytest.raises(ValueError, match="rename_start"):
-            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                               rename_start=-1)
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100, rename_start=-1)
 
     def test_non_int_rename_start_raises(self):
         """A non-int rename_start raises TypeError."""
         with pytest.raises(TypeError, match="rename_start"):
-            get_unique_new_dst(str(self.dir / "diff.txt"), 100,
-                               rename_start='1')
+            get_unique_new_dst(str(self.dir / "diff.txt"), 100, rename_start="1")
 
     def test_exhaustion_raises_runtime_error(self):
         """RuntimeError is raised when every candidate is occupied."""
@@ -1846,10 +1837,12 @@ class TestDryRunSession:
         """真实运行不查会话：以磁盘为准正常创建、不重复报告"""
         with dry_run_session():
             self._dry_copy(self.base / "r" / "a.txt", make_dir=True)  # 仅虚拟创建
-            copy(str(self.src), str(self.base / "r" / "b.txt"),
-                 make_dir=True, run_log=True)  # 真实创建
-            copy(str(self.src), str(self.base / "r" / "c.txt"),
-                 make_dir=True, run_log=True)  # 磁盘已存在 -> 不报告
+            copy(
+                str(self.src), str(self.base / "r" / "b.txt"), make_dir=True, run_log=True
+            )  # 真实创建
+            copy(
+                str(self.src), str(self.base / "r" / "c.txt"), make_dir=True, run_log=True
+            )  # 磁盘已存在 -> 不报告
 
         out = capsys.readouterr().out
         assert out.count("Create directory") == 2  # 虚拟一次 + 真实一次
@@ -1860,8 +1853,13 @@ class TestDryRunSession:
         """move 与 copy 共享同一会话状态"""
         with dry_run_session():
             self._dry_copy(self.base / "m" / "a.txt", make_dir=True)
-            move(str(self.src), str(self.base / "m" / "b.txt"),
-                 dry_run=True, make_dir=True, run_log=True)
+            move(
+                str(self.src),
+                str(self.base / "m" / "b.txt"),
+                dry_run=True,
+                make_dir=True,
+                run_log=True,
+            )
 
         out = capsys.readouterr().out
         assert out.count("Create directory") == 1

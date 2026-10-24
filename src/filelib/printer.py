@@ -8,9 +8,13 @@ each print method is gated by a flag captured at construction time.
 class Printer:
     """Route messages to dry-run / run-log / verbose / warning output."""
 
-    def __init__(self, dry_run: bool = False, run_log: bool = False,
-                 verbose: bool = False,
-                 ignore_warning: bool = False) -> None:
+    def __init__(
+        self,
+        dry_run: bool = False,
+        run_log: bool = False,
+        verbose: bool = False,
+        ignore_warning: bool = False,
+    ) -> None:
         """Store the output flags that gate the print methods."""
         self.dry_run = dry_run
         self.run_log = run_log

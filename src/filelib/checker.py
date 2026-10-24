@@ -1,6 +1,7 @@
 """
 File comparison utilities for checking if files and folders are identical.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -10,9 +11,7 @@ from pathlib import Path
 from filelib.scanner import ls
 
 
-def is_same_file(file1: str | Path,
-                 file2: str | Path,
-                 mode: str = 'hash') -> bool:
+def is_same_file(file1: str | Path, file2: str | Path, mode: str = "hash") -> bool:
     """
     Check if two files are identical.
 
@@ -40,7 +39,7 @@ def is_same_file(file1: str | Path,
     ValueError
         If mode is not 'hash' or 'full'.
     """
-    if mode not in ('hash', 'full'):
+    if mode not in ("hash", "full"):
         raise ValueError(f"mode must be 'hash' or 'full', got {mode!r}")
 
     file1_path = Path(file1)
@@ -51,7 +50,7 @@ def is_same_file(file1: str | Path,
     if not file2_path.exists():
         raise FileNotFoundError(f"File not found: {file2_path}")
 
-    if mode == 'hash':
+    if mode == "hash":
         return _compare_by_hash(file1_path, file2_path)
     # mode == 'full'
     return _compare_full(file1_path, file2_path)
@@ -62,7 +61,7 @@ def _compare_by_hash(file1: Path, file2: Path) -> bool:
 
     def get_file_hash(filepath: Path) -> str:
         sha256_hash = hashlib.sha256()
-        with open(filepath, 'rb') as f:
+        with open(filepath, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
@@ -72,7 +71,7 @@ def _compare_by_hash(file1: Path, file2: Path) -> bool:
 
 def _compare_full(file1: Path, file2: Path) -> bool:
     """Compare two files byte-by-byte."""
-    with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+    with open(file1, "rb") as f1, open(file2, "rb") as f2:
         while True:
             chunk1 = f1.read(4096)
             chunk2 = f2.read(4096)
@@ -82,13 +81,15 @@ def _compare_full(file1: Path, file2: Path) -> bool:
                 return True
 
 
-def is_same_folder(folder1: str | Path,
-                   folder2: str | Path,
-                   *,
-                   file_selector_func: Callable[[str], bool] | None = None,
-                   file_compare_mode: str = 'hash',
-                   compare_func: Callable[[Path, Path], bool] | None = None,
-                   report: bool = False) -> bool:
+def is_same_folder(
+    folder1: str | Path,
+    folder2: str | Path,
+    *,
+    file_selector_func: Callable[[str], bool] | None = None,
+    file_compare_mode: str = "hash",
+    compare_func: Callable[[Path, Path], bool] | None = None,
+    report: bool = False,
+) -> bool:
     """
     Check if two folders contain the same files with identical content.
 
@@ -141,8 +142,7 @@ def is_same_folder(folder1: str | Path,
             print(f"Files in {folder2_path}: {files2.keys()}")
         return False
 
-    diff_files = _compare_files(files1, files2, compare_func,
-                                file_compare_mode)
+    diff_files = _compare_files(files1, files2, compare_func, file_compare_mode)
 
     if diff_files:
         if report:
@@ -163,10 +163,11 @@ def _validate_folder(folder_path: Path) -> None:
 
 
 def _compare_files(
-        files1: dict[str, Path],
-        files2: dict[str, Path],
-        compare_func: Callable[[Path, Path], bool] | None,
-        file_compare_mode: str) -> dict[str, tuple[Path, Path]]:
+    files1: dict[str, Path],
+    files2: dict[str, Path],
+    compare_func: Callable[[Path, Path], bool] | None,
+    file_compare_mode: str,
+) -> dict[str, tuple[Path, Path]]:
     """Compare the shared entries of two file lists; return the failures.
 
     ``compare_func`` (custom comparator) takes precedence over
@@ -180,8 +181,7 @@ def _compare_files(
         if compare_func is not None:
             same = compare_func(file1_path, file2_path)
         else:
-            same = is_same_file(file1_path, file2_path,
-                                mode=file_compare_mode)
+            same = is_same_file(file1_path, file2_path, mode=file_compare_mode)
         if not same:
             diff_files[filename] = (file1_path, file2_path)
 
@@ -189,9 +189,8 @@ def _compare_files(
 
 
 def _get_folder_files(
-        folder: Path,
-        file_selector_func: Callable[[str], bool] | None = None
-        ) -> dict[str, Path]:
+    folder: Path, file_selector_func: Callable[[str], bool] | None = None
+) -> dict[str, Path]:
     """
     Get all files in a folder that match the filter function.
 
@@ -210,11 +209,13 @@ def _get_folder_files(
         Dictionary mapping relative file paths to absolute file paths.
     """
     files = {}
-    file_paths = ls(directory=str(folder),
-                    match_func=file_selector_func,
-                    recursive=True,
-                    path_type='rel_path',
-                    on_duplicates='ignore')
+    file_paths = ls(
+        directory=str(folder),
+        match_func=file_selector_func,
+        recursive=True,
+        path_type="rel_path",
+        on_duplicates="ignore",
+    )
     for rel_path_str in file_paths:
         abs_path = folder / rel_path_str
         files[rel_path_str] = abs_path

@@ -25,10 +25,11 @@ When implementing features in `filelib`, prefer using APIs from this package ove
 ```python
 # ✓ Preferred
 from filelib.scanner import ls
-files = ls(directory=folder, recursive=True, path_type='rel_path')
+
+files = ls(directory=folder, recursive=True, path_type="rel_path")
 
 # ✗ Avoid
-files = [p for p in folder.rglob('*') if p.is_file()]
+files = [p for p in folder.rglob("*") if p.is_file()]
 ```
 
 ### Import Style – Absolute Imports Only

@@ -9,9 +9,8 @@ from filelib.cli import main
 # _make_link_or_skip / _readlink_clean copied from tests/test_operator.py
 # (repo style: standalone test files, no cross-file imports).
 
-def _make_link_or_skip(link_path: Path,
-                       target: str,
-                       target_is_directory: bool = False) -> None:
+
+def _make_link_or_skip(link_path: Path, target: str, target_is_directory: bool = False) -> None:
     """Create a symlink, skipping on Windows without link privilege."""
     try:
         link_path.symlink_to(target, target_is_directory=target_is_directory)
@@ -32,18 +31,18 @@ def _readlink_clean(link_path: Path) -> str:
 # complete); image_complete's strict check only requires the file to end
 # with IEND, so no valid CRCs are needed (same fixtures as
 # tests/test_identifier.py).
-PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
-PNG_IHDR = b'\x00\x00\x00\x0dIHDR' + b'\x00' * 13 + b'\x00\x00\x00\x00'
-PNG_IEND = b'\x00\x00\x00\x00IEND\xaeB\x60\x82'
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+PNG_IHDR = b"\x00\x00\x00\x0dIHDR" + b"\x00" * 13 + b"\x00\x00\x00\x00"
+PNG_IEND = b"\x00\x00\x00\x00IEND\xaeB\x60\x82"
 
 
 def _write_png(path: Path, complete: bool = True) -> Path:
-    path.write_bytes(PNG_SIGNATURE + PNG_IHDR
-                     + (PNG_IEND if complete else b''))
+    path.write_bytes(PNG_SIGNATURE + PNG_IHDR + (PNG_IEND if complete else b""))
     return path
 
 
 # --- copy -----------------------------------------------------------------
+
 
 class TestCliCopy:
     """Tests for the `filelib copy` subcommand."""
@@ -107,8 +106,17 @@ class TestCliCopy:
         dst = self.dst_dir / "data.txt"
         dst.write_text("occupied")
 
-        rc = main(["copy", str(self.src_file), str(dst),
-                   "--exist-policy", "rename", "--rename-start", "1"])
+        rc = main(
+            [
+                "copy",
+                str(self.src_file),
+                str(dst),
+                "--exist-policy",
+                "rename",
+                "--rename-start",
+                "1",
+            ]
+        )
 
         assert rc == 0
         assert dst.read_text() == "occupied"
@@ -119,8 +127,7 @@ class TestCliCopy:
         dst = self.dst_dir / "data.txt"
         dst.write_text("old")
 
-        rc = main(["copy", str(self.src_file), str(dst),
-                   "--exist-policy", "overwrite"])
+        rc = main(["copy", str(self.src_file), str(dst), "--exist-policy", "overwrite"])
 
         captured = capsys.readouterr()
         assert rc == 0
@@ -130,8 +137,9 @@ class TestCliCopy:
     def test_invalid_exist_policy_exits_2(self):
         """非法 --exist-policy：argparse 用法错误，SystemExit 2"""
         with pytest.raises(SystemExit) as excinfo:
-            main(["copy", str(self.src_file), str(self.dst_dir / "x.txt"),
-                  "--exist-policy", "bogus"])
+            main(
+                ["copy", str(self.src_file), str(self.dst_dir / "x.txt"), "--exist-policy", "bogus"]
+            )
         assert excinfo.value.code == 2
 
     def test_make_dir_creates_missing_parents(self):
@@ -170,8 +178,17 @@ class TestCliCopy:
         dst = self.dst_dir / "data.txt"
         dst.write_text("occupied")
 
-        rc = main(["copy", str(self.src_file), str(dst),
-                   "--exist-policy", "rename", "--rename-format", "{stem}"])
+        rc = main(
+            [
+                "copy",
+                str(self.src_file),
+                str(dst),
+                "--exist-policy",
+                "rename",
+                "--rename-format",
+                "{stem}",
+            ]
+        )
 
         captured = capsys.readouterr()
         assert rc == 1
@@ -182,8 +199,17 @@ class TestCliCopy:
         dst = self.dst_dir / "data.txt"
         dst.write_text("occupied")
 
-        rc = main(["copy", str(self.src_file), str(dst),
-                   "--exist-policy", "rename", "--rename-start", "-1"])
+        rc = main(
+            [
+                "copy",
+                str(self.src_file),
+                str(dst),
+                "--exist-policy",
+                "rename",
+                "--rename-start",
+                "-1",
+            ]
+        )
 
         captured = capsys.readouterr()
         assert rc == 1
@@ -207,14 +233,12 @@ class TestCliCopySymlinks:
         (self.src_dir / "real.txt").write_text("real")
 
         # absolute in-tree file link / dir link -> retargeted
-        _make_link_or_skip(self.src_dir / "link_file",
-                           str(self.src_dir / "real.txt"))
-        _make_link_or_skip(self.src_dir / "link_dir",
-                           str(self.src_dir / "sub"),
-                           target_is_directory=True)
+        _make_link_or_skip(self.src_dir / "link_file", str(self.src_dir / "real.txt"))
+        _make_link_or_skip(
+            self.src_dir / "link_dir", str(self.src_dir / "sub"), target_is_directory=True
+        )
         # outside / relative targets -> verbatim
-        _make_link_or_skip(self.src_dir / "link_ext",
-                           str(self.external / "outside.txt"))
+        _make_link_or_skip(self.src_dir / "link_ext", str(self.external / "outside.txt"))
         _make_link_or_skip(self.src_dir / "link_rel", "real.txt")
 
         self.dst = self.root / "dst"
@@ -223,8 +247,7 @@ class TestCliCopySymlinks:
     def test_retarget_implies_preserve(self, capsys):
         """只给 --retarget-symlinks：隐含 --preserve-symlinks，
         链接按链接复制且被重定向（不出现库的禁用 Warning）"""
-        rc = main(["copy", str(self.src_dir), str(self.dst),
-                   "--retarget-symlinks"])
+        rc = main(["copy", str(self.src_dir), str(self.dst), "--retarget-symlinks"])
 
         captured = capsys.readouterr()
         assert rc == 0
@@ -232,27 +255,27 @@ class TestCliCopySymlinks:
         dst_link_dir = self.dst / "link_dir"
         assert dst_link_file.is_symlink()
         assert dst_link_dir.is_symlink()
-        assert os.path.normpath(_readlink_clean(dst_link_file)) == \
-            os.path.normpath(str(self.dst / "real.txt"))
+        assert os.path.normpath(_readlink_clean(dst_link_file)) == os.path.normpath(
+            str(self.dst / "real.txt")
+        )
         assert dst_link_dir.resolve() == (self.dst / "sub").resolve()
         assert "Warning:" not in captured.out
         assert "[RETARGET]" in captured.out
 
     def test_preserve_symlinks_keeps_links_without_retarget(self):
         """只给 --preserve-symlinks：保留链接，目标不变（仍指向源树）"""
-        rc = main(["copy", str(self.src_dir), str(self.dst),
-                   "--preserve-symlinks"])
+        rc = main(["copy", str(self.src_dir), str(self.dst), "--preserve-symlinks"])
 
         assert rc == 0
         dst_link_file = self.dst / "link_file"
         assert dst_link_file.is_symlink()
-        assert os.path.normpath(_readlink_clean(dst_link_file)) == \
-            os.path.normpath(str(self.src_dir / "real.txt"))
+        assert os.path.normpath(_readlink_clean(dst_link_file)) == os.path.normpath(
+            str(self.src_dir / "real.txt")
+        )
 
     def test_dry_run_previews_retarget_lines(self, capsys):
         """--dry-run + --retarget-symlinks：输出 [dry-run] [RETARGET] 预览，不落盘"""
-        rc = main(["copy", str(self.src_dir), str(self.dst),
-                   "--retarget-symlinks", "--dry-run"])
+        rc = main(["copy", str(self.src_dir), str(self.dst), "--retarget-symlinks", "--dry-run"])
 
         captured = capsys.readouterr()
         assert rc == 0
@@ -261,6 +284,7 @@ class TestCliCopySymlinks:
 
 
 # --- move -----------------------------------------------------------------
+
 
 class TestCliMove:
     """Tests for the `filelib move` subcommand."""
@@ -304,8 +328,7 @@ class TestCliMove:
         dst = self.dst_dir / "blocker.txt"
         dst.write_text("occupied")
 
-        rc = main(["move", str(self.src_file), str(dst),
-                   "--exist-policy", "rename"])
+        rc = main(["move", str(self.src_file), str(dst), "--exist-policy", "rename"])
 
         assert rc == 0
         assert dst.read_text() == "occupied"
@@ -333,8 +356,7 @@ class TestCliMove:
         src_folder = self.src_dir / "linked_tree"
         (src_folder / "sub").mkdir(parents=True)
         (src_folder / "real.txt").write_text("real")
-        _make_link_or_skip(src_folder / "link_file",
-                           str(src_folder / "real.txt"))
+        _make_link_or_skip(src_folder / "link_file", str(src_folder / "real.txt"))
         dst = self.dst_dir / "moved_tree"
 
         rc = main(["move", str(src_folder), str(dst), "--retarget-symlinks"])
@@ -342,11 +364,13 @@ class TestCliMove:
         assert rc == 0
         moved_link = dst / "link_file"
         assert moved_link.is_symlink()
-        assert os.path.normpath(_readlink_clean(moved_link)) == \
-            os.path.normpath(str(dst / "real.txt"))
+        assert os.path.normpath(_readlink_clean(moved_link)) == os.path.normpath(
+            str(dst / "real.txt")
+        )
 
 
 # --- merge ----------------------------------------------------------------
+
 
 class TestCliMerge:
     """Tests for the `filelib merge` subcommand."""
@@ -397,8 +421,9 @@ class TestCliMerge:
 
     def test_custom_rename_format(self):
         """--rename-format '{stem} ({i}){suffix}'：冲突文件落到 diff (0).txt"""
-        rc = main(["merge", str(self.src), str(self.dst),
-                   "--rename-format", "{stem} ({i}){suffix}"])
+        rc = main(
+            ["merge", str(self.src), str(self.dst), "--rename-format", "{stem} ({i}){suffix}"]
+        )
 
         assert rc == 0
         assert (self.dst / "diff (0).txt").read_text() == "source version"
@@ -434,14 +459,14 @@ class TestCliMerge:
 
 # --- check-image ----------------------------------------------------------
 
+
 class TestCliCheckImage:
     """Tests for the `filelib check-image` subcommand."""
 
     @pytest.fixture(autouse=True)
     def setup_tmpdir(self, tmp_path):
         self.complete_png = _write_png(tmp_path / "complete.png", complete=True)
-        self.truncated_png = _write_png(tmp_path / "truncated.png",
-                                        complete=False)
+        self.truncated_png = _write_png(tmp_path / "truncated.png", complete=False)
         self.notes_txt = tmp_path / "notes.txt"
         self.notes_txt.write_text("hello")
         return
@@ -465,8 +490,7 @@ class TestCliCheckImage:
 
     def test_extension_method_unsupported_txt_returns_0(self, capsys):
         """--mime-method extension 对 .txt：输出 unsupported，不影响退出码"""
-        rc = main(["check-image", str(self.notes_txt),
-                   "--mime-method", "extension"])
+        rc = main(["check-image", str(self.notes_txt), "--mime-method", "extension"])
 
         captured = capsys.readouterr()
         assert rc == 0
@@ -497,8 +521,7 @@ class TestCliCheckImage:
         captured = capsys.readouterr()
         assert rc == 1
         assert str(junk) in captured.err
-        assert "Summary: 1 files: 0 ok, 0 corrupted, 0 unsupported, 1 errors" \
-            in captured.out
+        assert "Summary: 1 files: 0 ok, 0 corrupted, 0 unsupported, 1 errors" in captured.out
 
     def test_missing_file_in_batch_reports_rest(self, capsys):
         """批量中含缺失文件：其余文件仍被报告，返回 1"""
@@ -513,27 +536,33 @@ class TestCliCheckImage:
 
     def test_mixed_batch_summary_line(self, capsys):
         """混合批次：ok/corrupted/unsupported 各一行 + Summary 行"""
-        rc = main(["check-image", str(self.complete_png),
-                   str(self.truncated_png), str(self.notes_txt),
-                   "--mime-method", "magic"])
+        rc = main(
+            [
+                "check-image",
+                str(self.complete_png),
+                str(self.truncated_png),
+                str(self.notes_txt),
+                "--mime-method",
+                "magic",
+            ]
+        )
 
         captured = capsys.readouterr()
         assert rc == 1
         assert ": ok" in captured.out
         assert ": corrupted" in captured.out
         assert ": unsupported" in captured.out
-        assert "Summary: 3 files: 1 ok, 1 corrupted, 1 unsupported, 0 errors" \
-            in captured.out
+        assert "Summary: 3 files: 1 ok, 1 corrupted, 1 unsupported, 0 errors" in captured.out
 
     def test_invalid_mime_method_exits_2(self):
         """非法 --mime-method：argparse 用法错误，SystemExit 2"""
         with pytest.raises(SystemExit) as excinfo:
-            main(["check-image", str(self.complete_png),
-                  "--mime-method", "bogus"])
+            main(["check-image", str(self.complete_png), "--mime-method", "bogus"])
         assert excinfo.value.code == 2
 
 
 # --- main / parser --------------------------------------------------------
+
 
 class TestCliMain:
     """Tests for main() dispatch and argparse behavior."""

@@ -51,15 +51,13 @@ def _no_proxy(monkeypatch):
 
 
 class TestDownloadResponse:
-
     def test_200_writes_file_with_exact_bytes(self, server_base, tmp_path):
         target = tmp_path / "out.bin"
         status = download_response(server_base + "/ok", str(target))
         assert status == 200
         assert target.read_bytes() == PAYLOAD
 
-    def test_non_200_returns_status_and_writes_nothing(self, server_base,
-                                                       tmp_path):
+    def test_non_200_returns_status_and_writes_nothing(self, server_base, tmp_path):
         target = tmp_path / "out.bin"
         status = download_response(server_base + "/missing", str(target))
         assert status == 404
@@ -93,8 +91,7 @@ class TestDownloadResponse:
         assert "already exists. Skipping download." in out
         assert target.read_bytes() == b"OLD"
 
-    def test_missing_parent_raises_file_not_found(self, server_base,
-                                                  tmp_path):
+    def test_missing_parent_raises_file_not_found(self, server_base, tmp_path):
         target = tmp_path / "no" / "such" / "dir" / "out.bin"
         with pytest.raises(FileNotFoundError):
             download_response(server_base + "/ok", str(target))
