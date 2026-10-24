@@ -18,8 +18,14 @@ classifiers = [
 dependencies = [
     "requests",
     "puremagic",
-    "image_complete",
+    # import name image_complete, distribution name python-image-complete;
+    # the bare module name does not exist on PyPI
+    "python-image-complete",
 ]
+
+[project.optional-dependencies]
+# development tools; the runtime dependencies above stay unconditional
+test = ["pytest"]
 
 [project.scripts]
 filelib = "filelib.cli:main"

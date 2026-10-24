@@ -339,6 +339,8 @@ pytest -q
 
 Network-bound downloader checks live in `tests/test_downloader_live.py` and are skipped by default; set `FILELIB_LIVE_TESTS=1` to run them against a real remote endpoint.
 
+CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check` and `pytest -q` (via `pip install -e ".[test]"`) on ubuntu-latest and windows-latest under Python 3.9 and 3.13.
+
 ## Current Limitations
 
 - `download_response` does not create parent directories automatically.
