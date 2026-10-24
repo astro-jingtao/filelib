@@ -243,6 +243,7 @@ Notes:
   - `warn`
   - `ignore`
 - Any other `on_duplicates` value raises `ValueError` before scanning starts.
+- Any other `path_type` value raises `ValueError` before scanning starts (an empty directory does not skip the check).
 
 ### `scanner.is_empty_dir`
 

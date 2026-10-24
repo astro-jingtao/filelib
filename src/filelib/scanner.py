@@ -55,10 +55,10 @@ def ls(
     Raises
     ------
     ValueError
-        If ``on_duplicates`` is not one of 'raise', 'warn', 'ignore'
-        (checked before scanning starts); if ``path_type`` is invalid
-        (raised when the first file is reached); or if duplicate file
-        names are found in 'file_only' mode with ``on_duplicates='raise'``.
+        If ``on_duplicates`` is not one of 'raise', 'warn', 'ignore' or
+        ``path_type`` is not one of the four allowed values (both checked
+        before scanning starts); or if duplicate file names are found in
+        'file_only' mode with ``on_duplicates='raise'``.
 
     Examples
     --------
@@ -67,10 +67,15 @@ def ls(
     """
 
     # 非法枚举值在扫描开始前即拒绝：与包内其他参数校验（ValueError）一致，
-    # 且不依赖"是否恰好存在重复名"才暴露。
+    # 且不依赖"是否恰好存在重复名"或"是否恰好遍历到文件"才暴露。
     if on_duplicates not in ("raise", "warn", "ignore"):
         raise ValueError(
             f"Invalid on_duplicates: {on_duplicates}. Choose from 'raise', 'warn', or 'ignore'."
+        )
+    if path_type not in ("file_only", "raw_full_path", "abs_full_path", "rel_path"):
+        raise ValueError(
+            f"Invalid path_type: {path_type}. "
+            "Choose from 'raw_full_path', 'abs_full_path', 'rel_path', 'file_only'."
         )
 
     result = []
@@ -110,9 +115,9 @@ def ls(
 def _format_entry_path(root: str, file: str, directory: str, path_type: str) -> str:
     """Build the output path for one file according to ``path_type``.
 
-    Raises ValueError for an unknown ``path_type`` — only when a file is
-    reached, so an empty directory never validates it (same as when the
-    logic lived inline in ``ls``).
+    Raises ValueError for an unknown ``path_type``. ``ls`` rejects invalid
+    values before scanning starts, so on its call path this is a defensive
+    guard for direct callers only.
     """
     if path_type == "abs_full_path":
         return os.path.abspath(os.path.join(root, file))

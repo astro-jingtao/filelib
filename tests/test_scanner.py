@@ -88,9 +88,21 @@ class TestLsOnDuplicates:
             ls(str(self.root), path_type="abs_full_path", on_duplicates="")
 
     def test_invalid_path_type_raises_value_error(self) -> None:
-        # path_type 的校验是惰性的：在遍历中遇到第一个文件时才抛出
+        # 非法 path_type：遍历中遇到文件时抛出（有文件的场景）
         with pytest.raises(ValueError, match="path_type"):
             ls(str(self.root), recursive=True, path_type="bogus")
+
+    def test_invalid_path_type_rejected_on_empty_dir(self, tmp_path: Path) -> None:
+        # 非法值在入口即拒绝：空目录（无文件可遍历）也必须抛出，而非静默返回 []
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        with pytest.raises(ValueError, match="path_type"):
+            ls(str(empty), path_type="bogus")
+
+    def test_invalid_path_type_rejected_when_all_filtered_out(self, tmp_path: Path) -> None:
+        # 匹配后无结果的目录同样在入口拒绝，不依赖"恰好有文件通过过滤"
+        with pytest.raises(ValueError, match="path_type"):
+            ls(str(self.root), match_func=lambda f: False, path_type="bogus")
 
 
 class TestIsEmptyDir:
