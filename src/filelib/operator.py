@@ -9,6 +9,7 @@ import contextvars
 import ntpath
 import os
 from pathlib import Path
+import posixpath
 import shutil
 import tempfile
 
@@ -935,13 +936,24 @@ def _map_link_target(link_target: str, src_root: str, dst_root: str) -> str:
     has_prefix = link_target.startswith(prefix)
     clean_target = link_target.removeprefix(prefix)
     clean_src = str(src_root).removeprefix(prefix)
-    # os.path carries the HOST platform's flavor (on POSIX, 'C:\\...' is
-    # not absolute and the remap silently no-ops); pick the module that
-    # matches the target string instead.
-    pathmod = ntpath if _is_windows_style(clean_target) else os.path
+    # The path flavor follows the target string itself: os.path carries
+    # the HOST platform's flavor ('C:\\...' is not absolute on POSIX and
+    # '/srv/...' is not absolute on Windows 3.13+), which would make the
+    # mapping platform- and version-dependent. Selection doubles as the
+    # absoluteness test — a drive/backslash anchor is absolute under
+    # Windows semantics in every version.
+    if _is_windows_style(clean_target):
+        pathmod = ntpath
+        target_is_abs = True
+    elif clean_target.startswith("/"):
+        pathmod = posixpath
+        target_is_abs = True
+    else:
+        pathmod = os.path
+        target_is_abs = pathmod.isabs(clean_target)
     try:
         common = pathmod.commonpath([clean_target, clean_src])
-        if pathmod.isabs(clean_target) and pathmod.normpath(common) == pathmod.normpath(clean_src):
+        if target_is_abs and pathmod.normpath(common) == pathmod.normpath(clean_src):
             rel_part = pathmod.relpath(clean_target, clean_src)
             if rel_part == ".":
                 # target == src_root: map to dst_root itself, without a
