@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 import contextvars
+import ntpath
 import os
 from pathlib import Path
 import shutil
@@ -207,8 +208,10 @@ def move(  # noqa: PLR0913
         change, including in ``dry_run`` mode.
     FileExistsError
         If ``src`` is a symlink or a directory and ``dst`` is an
-        existing file with ``exist_policy='default'`` (``os.rename``
-        cannot replace it; the source is left untouched).
+        existing file with ``exist_policy='default'`` (refused up
+        front, so the behavior is identical on Windows and POSIX —
+        POSIX ``os.rename`` would silently replace the file; the
+        source is left untouched).
     shutil.Error
         If ``dst`` is an existing directory and
         ``dst/<basename(src)>`` already exists.
@@ -241,8 +244,8 @@ def move(  # noqa: PLR0913
     | symlink    | missing          | ignored            | moved as a link, never retargeted      |
     | symlink    | existing dir     | ignored            | moved to dst/<basename(src)> as a      |
     |            |                  |                    | link; shutil.Error if that path exists |
-    | symlink    | existing file    | default            | FileExistsError (rename cannot replace |
-    |            |                  |                    | a file with a link; link left in place)|
+    | symlink    | existing file    | default            | FileExistsError (refused up front on   |
+    |            |                  |                    | every platform; link left in place)    |
     | symlink    | existing file    | overwrite          | existing file removed first, then      |
     |            |                  |                    | moved as a link                        |
     | symlink    | existing file    | rename             | link moved to stem_0.ext, never        |
@@ -287,6 +290,15 @@ def move(  # noqa: PLR0913
             _check_symlink_privilege()
 
     if not dry_run:
+        # The default-policy refusal (link/directory onto an existing
+        # file) must not ride on os.rename: POSIX rename silently
+        # replaces the file with the link. Enforce it up front so the
+        # contract holds on every platform.
+        if exist_policy == "default" and os.path.isfile(dst) and (src_is_link or src_is_dir):
+            raise FileExistsError(
+                f"cannot move a {'symlink' if src_is_link else 'directory'} onto the existing "
+                f"file {dst} with exist_policy='default'; the source is left untouched"
+            )
         if copy_function is None:
             shutil.move(src, dst)
         else:
@@ -885,6 +897,14 @@ def _validate(src_path: Path, dst_path: Path) -> None:
         raise ValueError(f"Destination folder must not be inside the source folder: {dst_path}")
 
 
+def _is_windows_style(path: str) -> bool:
+    """True for Windows-flavored absolute strings (drive letter or
+    backslash anchor), independent of the host platform."""
+    if len(path) >= 3 and path[1] == ":" and path[0].isalpha() and path[2] in ("\\", "/"):
+        return True
+    return path.startswith("\\")
+
+
 def _map_link_target(link_target: str, src_root: str, dst_root: str) -> str:
     """Remap an absolute symlink target inside ``src_root`` to the
     corresponding location under ``dst_root``; return the target
@@ -893,7 +913,9 @@ def _map_link_target(link_target: str, src_root: str, dst_root: str) -> str:
     The Windows ``\\\\?\\`` long-path prefix is preserved through the
     mapping. Pure string math only — never touches the filesystem and
     never resolves links, so ``src_root`` may no longer exist (after a
-    move).
+    move). The path flavor follows the target string itself: a
+    Windows-style target is remapped with Windows semantics under any
+    interpreter, so the mapping is identical on every platform.
 
     Parameters
     ----------
@@ -913,11 +935,20 @@ def _map_link_target(link_target: str, src_root: str, dst_root: str) -> str:
     has_prefix = link_target.startswith(prefix)
     clean_target = link_target.removeprefix(prefix)
     clean_src = str(src_root).removeprefix(prefix)
+    # os.path carries the HOST platform's flavor (on POSIX, 'C:\\...' is
+    # not absolute and the remap silently no-ops); pick the module that
+    # matches the target string instead.
+    pathmod = ntpath if _is_windows_style(clean_target) else os.path
     try:
-        common = os.path.commonpath([clean_target, clean_src])
-        if os.path.isabs(clean_target) and os.path.normpath(common) == os.path.normpath(clean_src):
-            rel_part = os.path.relpath(clean_target, clean_src)
-            new_target = str(Path(dst_root) / rel_part)
+        common = pathmod.commonpath([clean_target, clean_src])
+        if pathmod.isabs(clean_target) and pathmod.normpath(common) == pathmod.normpath(clean_src):
+            rel_part = pathmod.relpath(clean_target, clean_src)
+            if rel_part == ".":
+                # target == src_root: map to dst_root itself, without a
+                # trailing '.' component (str(Path(dst) / '.') collapsed
+                # it before; join() would keep it).
+                return f"{prefix}{dst_root}" if has_prefix else str(dst_root)
+            new_target = pathmod.join(str(dst_root), rel_part)
             return f"{prefix}{new_target}" if has_prefix else new_target
     except ValueError:
         # different drives (C:\ vs D:\) → commonpath raises

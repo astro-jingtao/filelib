@@ -921,6 +921,23 @@ class TestMapLinkTarget:
         )
         assert os.path.normpath(result) == os.path.normpath(r"D:\dst\sub\real.txt")
 
+    def test_posix_style_target_remapped(self):
+        """Docstring (_map_link_target): a POSIX-style target is remapped
+        with POSIX semantics on every platform — the flavor follows the
+        target string, not the host interpreter."""
+        result = operator_module._map_link_target(
+            "/srv/src_dir/sub/real.txt", "/srv/src_dir", "/srv/backup"
+        )
+        assert os.path.normpath(result) == os.path.normpath("/srv/backup/sub/real.txt")
+
+    def test_mixed_flavors_unchanged(self):
+        """Docstring (_map_link_target): a target whose flavor differs
+        from src_root's cannot lie inside it and is returned verbatim
+        (ntpath.commonpath raises on the drive mismatch)."""
+        target = r"C:\root\src_dir\sub\real.txt"
+        result = operator_module._map_link_target(target, "/srv/src_dir", "/srv/dst")
+        assert result == target
+
 
 class TestCopySymlinks:
     """Tests for copy's preserve_symlinks flag."""
@@ -1296,6 +1313,20 @@ class TestMoveSymlinks:
             move(str(link), str(dst))
 
         assert link.is_symlink()
+
+    def test_symlink_to_existing_file_default_dry_run_previews(self):
+        """Docstring (move): the default-policy refusal is a mutation-time
+        check — a dry run previews the move without raising (like the
+        historical Windows behavior), leaving both paths untouched."""
+        link = self.root / "link4"
+        _make_link_or_skip(link, str(self.src_dir / "real.txt"))
+        dst = self.root / "blocker.txt"
+        dst.write_text("block")
+
+        move(str(link), str(dst), dry_run=True)
+
+        assert link.is_symlink()
+        assert dst.read_text() == "block"
 
     def test_symlink_to_existing_file_overwrite(self):
         """Docstring (move, table): symlink src + existing file dst +
