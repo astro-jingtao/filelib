@@ -1,0 +1,23 @@
+# Local git hooks mirroring the CI ruff gates (.github/workflows/ci.yml).
+# Install once per clone:  conda run -n science pre-commit install
+# Run over everything:     conda run -n science pre-commit run --all-files
+#
+# `repo: local` + `language: system` on purpose: the hooks call the ruff
+# already installed in the active environment (pin it to the CI version).
+# The self-contained astral-sh/ruff-pre-commit remote cannot be used on
+# conda + Windows: pre-commit always builds hook envs with virtualenv, and
+# virtualenv-created envs from conda interpreters fail to import _ssl
+# ("DLL load failed"), so pip inside the hook env cannot reach any index.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        language: system
+        entry: ruff check
+        types: [python]
+      - id: ruff-format
+        name: ruff (format)
+        language: system
+        entry: ruff format
+        types_or: [python, markdown]

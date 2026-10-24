@@ -339,7 +339,7 @@ pytest -q
 
 Network-bound downloader checks live in `tests/test_downloader_live.py` and are skipped by default; set `FILELIB_LIVE_TESTS=1` to run them against a real remote endpoint.
 
-CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check` and `pytest -q` (via `pip install -e ".[test]"`) on ubuntu-latest and windows-latest under Python 3.9 and 3.13.
+CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check` and `pytest -q` (via `pip install -e ".[test]"`) on ubuntu-latest and windows-latest under Python 3.9 and 3.13. Pre-commit hooks (`.pre-commit-config.yaml`) mirror the ruff gates on each commit — after cloning, activate an environment with `ruff` on PATH (same version as CI) and run `pre-commit install`.
 
 ## Current Limitations
 
