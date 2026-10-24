@@ -122,8 +122,15 @@ def is_same_folder(
     FileNotFoundError
         If either folder does not exist.
     ValueError
-        If a path is not a directory.
+        If a path is not a directory, or if ``file_compare_mode`` is not
+        'hash' or 'full' (checked before scanning starts, even when
+        ``compare_func`` makes the mode unused).
     """
+    # 非法枚举值在扫描开始前即拒绝：不依赖"恰好比较到文件"才暴露
+    # （is_same_file 自己也会校验，但文件夹先于文件内容短路时轮不到它）。
+    if file_compare_mode not in ("hash", "full"):
+        raise ValueError(f"mode must be 'hash' or 'full', got {file_compare_mode!r}")
+
     folder1_path = Path(folder1)
     folder2_path = Path(folder2)
 

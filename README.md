@@ -258,6 +258,7 @@ Notes:
   - `True`: remove directory and all contents
   - `False`: fail on non-empty directory
   - `"skip"`: skip non-empty directory
+- Any other `recursive` value raises `ValueError` before anything is removed.
 - `dry_run=True` prints intended actions without changing filesystem.
 
 ### `operator.move` and `operator.copy`
@@ -268,7 +269,7 @@ Notes:
   - `rename`: auto-generate destination suffix (`_0`, `_1`, ...; pattern configurable via `rename_format`/`rename_start`)
 - `rename_format` (default `'{stem}_{i}{suffix}'`): template for the auto-renamed destination used by `exist_policy="rename"`, applied to the destination **file name** (candidates stay in the directory of `dst`). Placeholders: `{stem}` (file name without its final suffix), `{suffix}` (final suffix with its leading dot, empty for names like `README`), `{i}` (candidate index, format specs supported, e.g. `{i:03d}` for zero padding; literal braces as `{{`/`}}`).
 - `rename_start` (default `0`): first candidate index; use `1` for Windows-style `name_1.ext` numbering.
-- An invalid template (unknown placeholders, no placeholder varying with the index) or a negative `rename_start` raises `ValueError` when the rename is actually attempted — also in `dry_run` mode, so previews double as feasibility checks; a non-`str` `rename_format` or non-`int` `rename_start` raises `TypeError` instead.
+- An invalid `exist_policy`, an invalid template (unknown placeholders, no placeholder varying with the index) or a negative `rename_start` raises `ValueError` up front — whatever the destination state is, also in `dry_run` mode; a non-`str` `rename_format` or non-`int` `rename_start` raises `TypeError` instead.
 - `make_dir=True` creates missing destination parent directories.
 - In a batch of dry-run calls with `make_dir=True`, every call re-reports `Create directory <dir>` for a directory the batch would already have created; wrap the batch in `operator.dry_run_session()` to report each directory once, like the real run (see [`operator.dry_run_session`](#operatordry_run_session)).
 - `exist_policy` applies only when `dst` exists as a **file**; when `dst` is missing or an existing directory it is ignored (file/directory `src` is then placed into `dst/<basename(src)>`, or `copytree` raises `FileExistsError` for a directory `src` onto an existing directory).
@@ -311,7 +312,7 @@ with dry_run_session():
 ### `checker.is_same_file` / `checker.is_same_folder`
 
 - `is_same_file`: `mode='hash'` (SHA-256, default) or `'full'` (byte-by-byte); raises `FileNotFoundError` for a missing file and `ValueError` for an invalid mode.
-- `is_same_folder`: recursive, files matched by relative path; `file_selector_func` filters which files count, `file_compare_mode` picks the underlying `is_same_file` mode, `compare_func` overrides the per-file comparison entirely, `report=True` prints the differences. Two folders whose (selected) file sets are both empty are identical.
+- `is_same_folder`: recursive, files matched by relative path; `file_selector_func` filters which files count, `file_compare_mode` picks the underlying `is_same_file` mode (an invalid value raises `ValueError` before scanning starts, even when `compare_func` overrides the mode), `compare_func` overrides the per-file comparison entirely, `report=True` prints the differences. Two folders whose (selected) file sets are both empty are identical.
 
 ### `identifier.is_file_corrupted`
 
@@ -324,6 +325,7 @@ with dry_run_session():
 - MIME source can be:
   - `magic` (content-based)
   - `extension` (suffix-based)
+- An invalid `mime_method` or `unsupported_policy` value raises `ValueError` up front, before the file is opened — even when an explicit `mime=` or a supported MIME type would have made the value unused.
 
 ## Testing
 

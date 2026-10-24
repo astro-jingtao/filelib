@@ -66,6 +66,16 @@ class TestRemove:
         # 确保文件没有被删除
         assert self.non_empty_dir_path.exists()
 
+    def test_remove_invalid_recursive_raises_up_front(self):
+        """非法 recursive 值：在任何操作前抛 ValueError，而非静默落入 False 分支"""
+        for bad in ("bogus", 1):
+            with pytest.raises(ValueError, match="recursive must be"):
+                remove(str(self.non_empty_dir_path), recursive=bad)
+
+        # 入口拒绝意味着文件系统未被触碰
+        assert self.non_empty_dir_path.exists()
+        assert self.file_path.exists()
+
         # 应该是默认行为
         with pytest.raises(OSError, match="Directory not empty"):
             remove(str(self.non_empty_dir_path))
@@ -344,6 +354,29 @@ class TestMove:
 
         assert self.src_file.exists()
 
+    def test_move_exist_policy_invalid_rejected_up_front(self):
+        """非法 exist_policy + 不存在的目标：入口即抛 ValueError，不再静默忽略"""
+        missing_dst = self.dst_dir / "absent.txt"
+
+        with pytest.raises(ValueError, match="exist_policy must be"):
+            move(str(self.src_file), str(missing_dst), exist_policy="invalid")
+
+        assert self.src_file.exists()
+
+    def test_move_invalid_rename_spec_rejected_up_front(self):
+        """非法 rename_format + 不会触发重命名的调用：入口即抛 ValueError"""
+        missing_dst = self.dst_dir / "absent.txt"
+
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            move(
+                str(self.src_file),
+                str(missing_dst),
+                exist_policy="default",
+                rename_format="{bad}",
+            )
+
+        assert self.src_file.exists()
+
     def test_move_exist_policy_rename_custom_format(self):
         """exist_policy='rename' + 自定义 rename_format：按模板生成新名"""
         dst_file = self.dst_dir / "target.txt"
@@ -580,6 +613,29 @@ class TestCopy:
 
         with pytest.raises(ValueError, match="exist_policy must be"):
             copy(str(self.src_file), str(dst_file), exist_policy="invalid")
+
+        assert self.src_file.exists()
+
+    def test_copy_exist_policy_invalid_rejected_up_front(self):
+        """非法 exist_policy + 不存在的目标：入口即抛 ValueError，不再静默忽略"""
+        missing_dst = self.dst_dir / "absent.txt"
+
+        with pytest.raises(ValueError, match="exist_policy must be"):
+            copy(str(self.src_file), str(missing_dst), exist_policy="invalid")
+
+        assert self.src_file.exists()
+
+    def test_copy_invalid_rename_spec_rejected_up_front(self):
+        """非法 rename_format + 不会触发重命名的调用：入口即抛 ValueError"""
+        missing_dst = self.dst_dir / "absent.txt"
+
+        with pytest.raises(ValueError, match="Invalid rename_format"):
+            copy(
+                str(self.src_file),
+                str(missing_dst),
+                exist_policy="default",
+                rename_format="{bad}",
+            )
 
         assert self.src_file.exists()
 

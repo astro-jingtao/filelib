@@ -64,6 +64,16 @@ class TestIsFileCorrupted:
         with pytest.raises(ValueError, match="Invalid mime_method"):
             is_file_corrupted(str(self.complete_png), mime_method="bogus")
 
+    def test_invalid_mime_method_raises_even_with_explicit_mime(self):
+        """非法 mime_method + 显式 mime：仍抛 ValueError（入口即拒绝，不因短路静默）"""
+        with pytest.raises(ValueError, match="Invalid mime_method"):
+            is_file_corrupted(str(self.complete_png), mime="image/png", mime_method="bogus")
+
+    def test_invalid_unsupported_policy_raises_on_supported_mime(self):
+        """非法 unsupported_policy + 受支持 MIME：仍抛 ValueError（入口即拒绝）"""
+        with pytest.raises(ValueError, match="Invalid unsupported_policy"):
+            is_file_corrupted(str(self.complete_png), unsupported_policy="bogus")
+
     def test_explicit_mime_skips_detection(self):
         """显式传入 mime：跳过探测，直接按该 MIME 检查"""
         # text/plain 不在受支持列表中 -> None，证明没有走文件探测

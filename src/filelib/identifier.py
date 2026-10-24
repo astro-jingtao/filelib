@@ -51,10 +51,19 @@ def is_file_corrupted(
 
     Returns True/False for checkable images; ``unsupported_return``
     (default None) when the detected MIME type has no checker; raises
-    ValueError for an invalid ``mime_method``, or for an unsupported
-    MIME type with ``unsupported_policy='raise'``. See README for the
-    full parameter semantics.
+    ValueError for an invalid ``mime_method`` or ``unsupported_policy``
+    (both checked before the file is opened, regardless of whether the
+    current inputs would exercise them), or for an unsupported MIME type
+    with ``unsupported_policy='raise'``. See README for the full
+    parameter semantics.
     """
+    # 非法枚举值在打开文件前即拒绝：不依赖"恰好显式传入 mime"或
+    # "恰好命中不支持的 MIME"才暴露。
+    if mime_method not in ("magic", "extension"):
+        raise ValueError(f"Invalid mime_method: {mime_method}")
+    if unsupported_policy not in ("return", "raise"):
+        raise ValueError(f"Invalid unsupported_policy: {unsupported_policy}")
+
     # image_complete's load() only accepts str/bytes/BytesIO; a Path makes
     # every checker return False (false "corrupted" + "Unhandled data
     # type" noise), so normalize before dispatching.
@@ -63,17 +72,13 @@ def is_file_corrupted(
     if mime is None:
         if mime_method == "magic":
             mime = get_mime_magic(file_path)
-        elif mime_method == "extension":
+        else:  # 'extension'（非法值已在入口拒绝）
             mime = get_mime_extension(file_path)
-        else:
-            raise ValueError(f"Invalid mime_method: {mime_method}")
 
     checker = MIME_COMPLETE_CHECKER_MAP.get(mime)
     if checker is None:
-        if unsupported_policy == "return":
-            return unsupported_return
         if unsupported_policy == "raise":
             raise ValueError(f"Unsupported MIME type: {mime}")
-        raise ValueError(f"Invalid unsupported_policy: {unsupported_policy}")
+        return unsupported_return
 
     return not checker(file_path)

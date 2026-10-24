@@ -130,6 +130,27 @@ class TestIsSameFolder:
         """Test with folders having different content."""
         assert not is_same_folder(setup_folders["same1"], setup_folders["different"])
 
+    def test_is_same_folder_invalid_file_compare_mode_raises(self, setup_folders):
+        """An invalid file_compare_mode raises before scanning starts, even
+        when the file-set mismatch would short-circuit before any comparison."""
+        with pytest.raises(ValueError, match="mode must be"):
+            is_same_folder(
+                setup_folders["same1"],
+                setup_folders["different"],
+                file_compare_mode="bogus",
+            )
+
+    def test_is_same_folder_invalid_mode_raises_with_compare_func(self, setup_folders):
+        """An invalid file_compare_mode raises even when compare_func makes
+        the mode unused."""
+        with pytest.raises(ValueError, match="mode must be"):
+            is_same_folder(
+                setup_folders["same1"],
+                setup_folders["same2"],
+                file_compare_mode="bogus",
+                compare_func=lambda a, b: True,
+            )
+
     def test_is_same_folder_empty_folders(self, tmp_path):
         """Test with empty folders."""
         empty1 = tmp_path / "empty1"
@@ -188,13 +209,15 @@ class TestIsSameFolder:
 
     def test_is_same_folder_compare_func_priority(self, setup_folders):
         """Custom compare_func should take precedence over file_compare_mode."""
-        # Keep structure identical but content different so compare_func branch is exercised.
+        # Keep structure identical but content different so compare_func branch
+        # is exercised: with either built-in mode the differing content would
+        # compare False, so True proves compare_func was consulted instead.
         (setup_folders["same2"] / "file1.txt").write_text("changed")
 
         assert is_same_folder(
             setup_folders["same1"],
             setup_folders["same2"],
-            file_compare_mode="invalid_mode",
+            file_compare_mode="full",
             compare_func=lambda file1, file2: True,
         )
 

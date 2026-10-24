@@ -63,12 +63,16 @@ def remove(
     Args:
         path (str): 要删除的文件或文件夹路径。
         recursive (bool or str): 控制非空文件夹的行为。
-            True  : 连带内容一同删除 (默认行为，使用 shutil.rmtree)。
+            True  : 连带内容一同删除 (使用 shutil.rmtree)。
             False : 如果文件夹非空，则报错。
             'skip': 如果文件夹非空，则跳过不删除。
         dry_run (bool): 如果为 True，仅打印将要执行的操作，不实际删除。
         run_log (bool): 如果为 True，在执行操作时打印详细信息。
+
+    Raises:
+        ValueError: recursive 不是 True/False/'skip' 之一（在任何操作前拒绝）。
     """
+    _validate_recursive(recursive)
 
     printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
 
@@ -188,9 +192,8 @@ def move(  # noqa: PLR0913
     ValueError
         If ``exist_policy`` is not one of ``'default'``, ``'overwrite'``,
         ``'rename'``, or if ``rename_format`` / ``rename_start`` have
-        invalid values — the latter is checked only when a rename is
-        actually attempted (``exist_policy='rename'`` and ``dst`` exists
-        as a file), also in ``dry_run`` mode.
+        invalid values — all checked up front, whatever the destination
+        state is (also in ``dry_run`` mode).
     TypeError
         If ``rename_format`` is not a ``str`` or ``rename_start`` is not
         an ``int`` — checked together with the value checks above.
@@ -379,9 +382,8 @@ def copy(  # noqa: PLR0913
     ValueError
         If ``exist_policy`` is not one of ``'default'``, ``'overwrite'``,
         ``'rename'``, or if ``rename_format`` / ``rename_start`` have
-        invalid values — the latter is checked only when a rename is
-        actually attempted (``exist_policy='rename'`` and ``dst`` exists
-        as a file), also in ``dry_run`` mode.
+        invalid values — all checked up front, whatever the destination
+        state is (also in ``dry_run`` mode).
     TypeError
         If ``rename_format`` is not a ``str`` or ``rename_start`` is not
         an ``int`` — checked together with the value checks above.
@@ -646,6 +648,18 @@ def merge_folders(
     return {"copied": copied, "skipped": skipped, "renamed": renamed}
 
 
+def _validate_recursive(recursive: bool | str) -> None:
+    """Raise ValueError unless ``recursive`` is True, False or 'skip'.
+
+    非法值在入口即拒绝：否则会静默落入 recursive=False 分支，或在非空
+    目录上抛出难解读的底层 OSError，而不是指出参数本身错了。
+    身份比较（is True / is False）而非成员测试：``1 in (True, ...)`` 会
+    因 1 == True 成立而放过 1 这类真值整数。
+    """
+    if recursive is not True and recursive is not False and recursive != "skip":
+        raise ValueError(f"recursive must be True, False or 'skip', got {recursive!r}")
+
+
 def _check_dst_parent_folder_exist(
     dst: str, make_dir: bool, dry_run: bool, printer: Printer
 ) -> None:
@@ -737,9 +751,22 @@ def _check_dst_exist(
         ``exist_policy='rename'`` (see ``get_unique_new_dst``).
     rename_start : int, default 0
         First candidate index for ``exist_policy='rename'``.
+
+    Raises
+    ------
+    ValueError
+        If ``exist_policy`` is invalid; the rename spec is validated here
+        as well (both up front, so ``move``/``copy`` reject bad values
+        whatever the destination state is).
     """
 
     MAX_TRY = 10000
+
+    # 非法枚举值与非法 rename 模板在入口即拒绝：不依赖"目标恰好存在"
+    # 或"恰好触发一次重命名"才暴露（与 merge_folders 的前置校验一致）。
+    if exist_policy not in ("default", "overwrite", "rename"):
+        raise ValueError("exist_policy must be 'default', 'overwrite' or 'rename'")
+    _validate_rename_spec(rename_format, rename_start)
 
     if (exist_policy == "default") or os.path.isdir(dst) or not os.path.exists(dst):
         return dst
@@ -750,12 +777,8 @@ def _check_dst_exist(
             os.remove(dst)
         printer.print_general_run_log(f"Removed existing file: {dst}")
         return dst
-    if exist_policy == "rename":
-        dst_new = get_unique_new_dst(
-            dst, MAX_TRY, rename_format=rename_format, rename_start=rename_start
-        )
-        return dst_new
-    raise ValueError("exist_policy must be 'default', 'overwrite' or 'rename'")
+    # 只剩 'rename'（非法值已在入口拒绝）
+    return get_unique_new_dst(dst, MAX_TRY, rename_format=rename_format, rename_start=rename_start)
 
 
 def get_unique_new_dst(

@@ -82,9 +82,9 @@ What happens depends on what `dst` is; `exist_policy` applies only to the last r
 | existing **directory** | source lands **inside** as `dst/<basename(src)>` |
 | existing **file** | `'default'` — `copy` silently overwrites, `move` replaces; `'overwrite'` — dst removed first; `'rename'` — first free name from `rename_format` |
 
-- An invalid `exist_policy` string raises only when the policy actually fires (existing-file `dst`).
+- An invalid `exist_policy` string, an invalid `rename_format` (unknown placeholders, template constant in `{i}`) or a negative `rename_start` raises `ValueError` up front, whatever the destination state is (in `dry_run` too); wrong argument types raise `TypeError`.
 - Dry-run batches: a dry-run call never creates directories, so repeated calls into the same missing parent re-print `Create directory`. Wrap the batch in `with operator.dry_run_session():` and each directory is reported once, matching the real run (missing ancestors remembered like `os.makedirs`; destination *file* existence still comes from the real filesystem, and real runs ignore the session).
-- `rename_format` (default `'{stem}_{i}{suffix}'`) renders the destination **file name**; placeholders `{stem}`, `{suffix}` (may be empty), `{i}` (format specs such as `{i:03d}` allowed). The template must vary with the index — value violations raise `ValueError` when a rename fires (in `dry_run` too), wrong argument types raise `TypeError`; `merge_folders` validates the spec up front instead.
+- `rename_format` (default `'{stem}_{i}{suffix}'`) renders the destination **file name**; placeholders `{stem}`, `{suffix}` (may be empty), `{i}` (format specs such as `{i:03d}` allowed). The template must vary with the index; all spec problems raise up front in `move`/`copy`/`merge_folders` alike.
 - Copying follows symlinks by default; a dangling link inside a tree raises.
 
 ## Deletion — `operator.remove`
@@ -126,7 +126,7 @@ Files are matched by relative path; nothing is ever overwritten:
 
 ## Image integrity — `identifier.is_file_corrupted`
 
-- MIME from content (`mime_method='magic'`, default) or from extension; an explicit `mime=` short-circuits detection. Supported: jpeg, png, gif, bmp, webp.
+- MIME from content (`mime_method='magic'`, default) or from extension; an explicit `mime=` short-circuits detection (invalid `mime_method`/`unsupported_policy` values still raise `ValueError` up front). Supported: jpeg, png, gif, bmp, webp.
 - Returns `True` (corrupted) / `False` (complete); unsupported MIME → `unsupported_return` (default `None`) with `unsupported_policy='return'`, or `ValueError` with `'raise'`.
 - CLI `check-image`: one `<path>: ok|corrupted|unsupported` line per file plus a `Summary:` line; unsupported files do not affect the exit code; corrupted files and per-file errors (missing file, unidentifiable content) do → exit 1.
 
@@ -210,8 +210,8 @@ From the shell: `filelib check-image <files...>` — exit code 1 when anything i
 | ------ | ------- | -------- |
 | `FileNotFoundError` about dst's parent | destination parent missing | pass `make_dir=True`, or create it first |
 | `OSError: Directory not empty` | `remove(recursive=False)` on a non-empty directory | choose `recursive=True` or `'skip'` deliberately |
-| `ValueError: exist_policy must be ...` | invalid policy, fired on an existing-file dst | use `default` / `overwrite` / `rename` |
-| `ValueError: Invalid rename_format ...` | unknown placeholder, or template constant in `{i}` | keep `{i}` (or an index-dependent placeholder) in the template |
+| `ValueError: exist_policy must be ...` | invalid policy, rejected up front | use `default` / `overwrite` / `rename` |
+| `ValueError: Invalid rename_format ...` | unknown placeholder, or template constant in `{i}`, rejected up front | keep `{i}` (or an index-dependent placeholder) in the template |
 | `FileExistsError` | directory src onto existing dst (copytree); symlink recreated or moved onto an existing file | clear or rename the destination, or change policy |
 | `shutil.Error` | source moved/copied into an occupied `dst/<basename(src)>` | rename or clear the occupant |
 | `PermissionError` from the symlink probe | this environment cannot create links | enable Developer Mode / admin rights, or drop the symlink flags |
