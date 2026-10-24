@@ -110,7 +110,10 @@ def remove(path: str, recursive: bool | str = False, dry_run: bool = False,
         printer.print_general_run_log(f"Removed file: {path}")
 
 
-def move(src: str | Path,
+# PLR0913 waiver: the option parameters are the deliberate API surface of
+# this operation; the count is accepted as-is rather than hidden behind a
+# parameter object or accommodated in the shared max-args threshold.
+def move(src: str | Path,  # noqa: PLR0913
          dst: str | Path,
          *,
          copy_function: Callable | None = None,
@@ -292,7 +295,10 @@ def move(src: str | Path,
     printer.print_general_run_log(f"Moved {src} to {dst}")
 
 
-def copy(src: str | Path,
+# PLR0913 waiver: the option parameters are the deliberate API surface of
+# this operation; the count is accepted as-is rather than hidden behind a
+# parameter object or accommodated in the shared max-args threshold.
+def copy(src: str | Path,  # noqa: PLR0913
          dst: str | Path,
          *,
          copy_function: Callable | None = None,
