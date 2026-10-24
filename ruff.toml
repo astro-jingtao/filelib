@@ -166,9 +166,6 @@ select = [
     # Detect timezone-naive datetime usage that commonly causes data bugs.
     "DTZ",
 
-    # Prefer modern pathlib APIs for filesystem paths where practical.
-    "PTH",
-
     # Detect code that appears to have been commented out. Version control should
     # preserve obsolete implementations instead of source comments.
     "ERA",
@@ -190,11 +187,8 @@ ignore = [
     "ISC001",  # single-line implicit concatenation can conflict with formatter
     "RET504",  # a named value before return can improve debugging/readability
     "SIM108",  # ternary expressions are not always clearer than if/else
-    "PTH123",  # requiring Path.open over open has limited general benefit
     "RUF012",  # false positives in ORM/Pydantic/declarative class models
     "ERA001",  # Commented-out code is not bad
-    "PTH118",  # `os.path.join()` is not bad
-    "PTH208",  # `os.listdir` is not bad
 ]
 
 # `--fix` may apply all fixes that Ruff classifies as safe. Unsafe fixes still
