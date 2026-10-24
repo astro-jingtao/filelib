@@ -31,7 +31,7 @@ Windows/PowerShell environment. Tests must run in the `science` conda env (the o
   - `cli.py` — argparse console entry point `filelib` (`copy|move|merge|check-image`, `main(argv) -> int`) over `operator`/`identifier`; exit codes 0/1/2, run log on by default, `copy --retarget-symlinks` implies `--preserve-symlinks`
 - `__init__.py` deliberately exports only a subset (`is_same_file`, `is_same_folder`); consumers import other functions from submodules.
 - Windows specifics: symlink creation needs admin/Developer Mode. Tests skip or tolerate this (`tests/test_scanner.py::_prepare_symlink_tree`).
-- Known gaps (also tracked in README "Current Limitations"): `download_response` does not create parent directories; `operator.copy` has an unresolved recursion TODO.
+- Known gaps (also tracked in README "Current Limitations"): `download_response` does not create parent directories.
 
 ## Conventions
 

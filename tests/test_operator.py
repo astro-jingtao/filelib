@@ -558,6 +558,21 @@ class TestCopy:
         assert dst_folder.exists()
         assert (dst_folder / "inner.txt").read_text() == "inner content"
 
+    def test_copy_directory_deep_tree_recursive(self):
+        """复制多层嵌套目录树：递归复制到任意深度（copy 无需 -r 开关）"""
+        # 三层嵌套：src_folder/deep/l2/l3/file.txt
+        deep = self.src_folder / "deep" / "l2" / "l3"
+        deep.mkdir(parents=True)
+        (deep / "leaf.txt").write_text("leaf content")
+        (self.src_folder / "deep" / "mid.txt").write_text("mid content")
+
+        dst_folder = self.dst_dir / "copied_folder"
+
+        copy(str(self.src_folder), str(dst_folder))
+
+        assert (dst_folder / "deep" / "mid.txt").read_text() == "mid content"
+        assert (dst_folder / "deep" / "l2" / "l3" / "leaf.txt").read_text() == "leaf content"
+
     def test_copy_make_dir_true_creates_parent(self):
         """make_dir=True 时自动创建父目录并复制"""
         dst_file = self.test_dir / "new_parent" / "deep" / "copied.txt"

@@ -471,7 +471,6 @@ def copy(  # noqa: PLR0913
       suffix come from the replaced destination path (so a directory
       tree lands at the renamed path, e.g. ``blocker_0.txt/``).
     """
-    # TODO: if -r
 
     printer = Printer(dry_run=dry_run, run_log=run_log, ignore_warning=False)
 
